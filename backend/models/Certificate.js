@@ -68,6 +68,16 @@ const certificateSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },
+    // Stores the exact original PDF bytes so download returns the SAME file
+    // whose SHA-256 hash is registered on the blockchain (enables offline verification)
+    originalPdf: {
+      type: Buffer,
+      select: false, // never returned in list/search — only fetched on explicit .select("+originalPdf")
+    },
+    originalPdfName: {
+      type: String,
+      default: "certificate.pdf",
+    },
   },
   {
     timestamps: true,

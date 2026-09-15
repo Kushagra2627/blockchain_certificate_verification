@@ -1,25 +1,20 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { AlertCircle, Home } from "lucide-react";
 
 const NotFound = () => {
   return (
-    <div className="min-h-[calc(100vh-120px)] flex flex-col items-center justify-center text-center p-6 space-y-6">
-      <div className="w-16 h-16 rounded-3xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center">
-        <AlertCircle className="w-8 h-8" />
+    <div className="min-h-[calc(100vh-64px)] flex items-center justify-center p-6 text-center">
+      <div className="space-y-4 max-w-md">
+        <span className="material-symbols-outlined text-6xl text-[#ffb4ab]">error_outline</span>
+        <h1 className="text-4xl font-bold text-[#dce3f1]">404 - Page Not Found</h1>
+        <p className="text-xs text-[#bbcabf]">The requested route or verification record does not exist.</p>
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg bg-[#10b981] text-[#00422b] font-semibold text-xs transition-all shadow-md"
+        >
+          Back to Verification Portal
+        </Link>
       </div>
-      <div className="space-y-2">
-        <h1 className="text-4xl font-extrabold text-slate-100">404 - Page Not Found</h1>
-        <p className="text-slate-400 text-sm max-w-md mx-auto">
-          The page or certificate record you are attempting to locate does not exist on this network node.
-        </p>
-      </div>
-      <Link
-        to="/"
-        className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm shadow-lg shadow-indigo-600/30 transition-all"
-      >
-        <Home className="w-4 h-4" /> Return to Home
-      </Link>
     </div>
   );
 };

@@ -11,7 +11,6 @@ const ProtectedRoute = ({ children, roles = [] }) => {
 
   if (user?.role === "Student") {
     // Students can ONLY access /certificates and /certificates/:id
-    // If a Student tries to access /dashboard, /issue, or /verify, redirect to /certificates
     if (roles.length > 0 && !roles.includes("Student")) {
       return <Navigate to="/certificates" replace />;
     }

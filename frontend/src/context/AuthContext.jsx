@@ -3,76 +3,86 @@ import { authService } from "../services/authService";
 
 export const AuthContext = createContext();
 
+export const useAuth = () => React.useContext(AuthContext);
+
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(() => {
-    const savedUser = localStorage.getItem("cert_user");
-    return savedUser ? JSON.parse(savedUser) : null;
-  });
-  const [token, setToken] = useState(() => localStorage.getItem("cert_token") || null);
-  const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const currentUser = authService.getCurrentUser();
+    if (currentUser) {
+      setUser(currentUser);
+    }
+    setLoading(false);
+  }, []);
 
   const login = async (credentials) => {
-    setLoading(true);
     try {
+      // authService.login returns { success, data: { _id, name, email, role, token } }
       const response = await authService.login(credentials);
-      if (response.success) {
-        const { token: jwtToken, ...userData } = response.data;
+      if (response.success && response.data) {
+        const userData = {
+          _id: response.data._id,
+          name: response.data.name,
+          email: response.data.email,
+          role: response.data.role,
+          institution: response.data.institution,
+        };
         setUser(userData);
-        setToken(jwtToken);
-        localStorage.setItem("cert_token", jwtToken);
-        localStorage.setItem("cert_user", JSON.stringify(userData));
-        return { success: true };
+        return { success: true, user: userData };
       }
+      return { success: false, message: response.message || "Login failed" };
     } catch (error) {
       return {
         success: false,
-        message: error.response?.data?.message || "Login failed. Check server connection.",
+        message: error.response?.data?.message || "Login failed. Check your credentials.",
       };
-    } finally {
-      setLoading(false);
     }
   };
 
   const register = async (userData) => {
-    setLoading(true);
     try {
+      // authService.register returns { success, data: { _id, name, email, role, token } }
       const response = await authService.register(userData);
-      if (response.success) {
-        const { token: jwtToken, ...userInfo } = response.data;
-        setUser(userInfo);
-        setToken(jwtToken);
-        localStorage.setItem("cert_token", jwtToken);
-        localStorage.setItem("cert_user", JSON.stringify(userInfo));
-        return { success: true };
+      if (response.success && response.data) {
+        const user = {
+          _id: response.data._id,
+          name: response.data.name,
+          email: response.data.email,
+          role: response.data.role,
+          institution: response.data.institution,
+        };
+        setUser(user);
+        return { success: true, user };
       }
+      return { success: false, message: response.message || "Registration failed" };
     } catch (error) {
       return {
         success: false,
         message: error.response?.data?.message || "Registration failed.",
       };
-    } finally {
-      setLoading(false);
     }
   };
 
   const logout = () => {
+    authService.logout();
     setUser(null);
-    setToken(null);
-    localStorage.removeItem("cert_token");
-    localStorage.removeItem("cert_user");
   };
+
+  const isAdmin = user?.role === "Admin";
+  const isAuthenticated = !!user;
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        token,
         loading,
+        isAuthenticated,
+        isAdmin,
         login,
         register,
         logout,
-        isAuthenticated: !!token,
-        isAdmin: user?.role === "Admin",
       }}
     >
       {children}

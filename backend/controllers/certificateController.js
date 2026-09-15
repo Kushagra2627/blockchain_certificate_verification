@@ -28,7 +28,15 @@ const issueCertificate = async (req, res, next) => {
       .digest("hex")
       .toLowerCase();
 
-    const formattedCertId = certificateId ? certificateId.trim().toUpperCase() : "";
+    // Auto-generate a unique certificateId if not provided by the admin
+    const generateCertId = () => {
+      const year = new Date().getFullYear();
+      const rand = Math.random().toString(36).substring(2, 8).toUpperCase();
+      return `CERT-${year}-${rand}`;
+    };
+    const formattedCertId = certificateId
+      ? certificateId.trim().toUpperCase()
+      : generateCertId();
 
     // Check MongoDB duplicate hash
     const existingCert = await Certificate.findOne({ documentHash });
@@ -59,10 +67,11 @@ const issueCertificate = async (req, res, next) => {
       blockchainStatus = "Pending";
     }
 
-    // Save in MongoDB
+    // Save in MongoDB — store original PDF bytes so download returns the EXACT same file
+    // (same SHA-256 hash as registered on-chain, enabling company verification)
     const newCertificate = await Certificate.create({
       documentHash,
-      certificateId: formattedCertId || undefined,
+      certificateId: formattedCertId,
       studentName,
       studentEmail: studentEmail || "",
       course,
@@ -73,6 +82,8 @@ const issueCertificate = async (req, res, next) => {
       transactionHash: txReceipt.transactionHash,
       blockchainStatus,
       issuedBy: req.user ? req.user._id : undefined,
+      originalPdf: req.file.buffer,
+      originalPdfName: req.file.originalname || `${formattedCertId}.pdf`,
     });
 
     return res.status(201).json({
@@ -142,9 +153,16 @@ const getCertificateById = async (req, res, next) => {
     const identifier = req.params.identifier.trim();
     let certificate;
 
-    if (identifier.length === 64 && /^[0-9a-fA-F]{64}$/.test(identifier)) {
+    // 1. MongoDB ObjectId lookup (24-char hex) — used by frontend card links
+    if (/^[0-9a-fA-F]{24}$/.test(identifier)) {
+      certificate = await Certificate.findById(identifier).populate("issuedBy", "name email");
+    }
+    // 2. SHA-256 document hash lookup (64-char hex)
+    else if (identifier.length === 64 && /^[0-9a-fA-F]{64}$/.test(identifier)) {
       certificate = await Certificate.findOne({ documentHash: identifier.toLowerCase() }).populate("issuedBy", "name email");
-    } else {
+    }
+    // 3. Human-readable certificateId (e.g. "CERT-2024-001")
+    else {
       certificate = await Certificate.findOne({ certificateId: identifier.toUpperCase() }).populate("issuedBy", "name email");
     }
 
@@ -185,60 +203,120 @@ const verifyCertificate = async (req, res, next) => {
       });
     }
 
-    // Step 1: Calculate SHA-256 hash from uploaded PDF buffer
+    // Step 1: Compute SHA-256 hash from the uploaded PDF bytes
     const uploadedHash = crypto
       .createHash("sha256")
       .update(req.file.buffer)
       .digest("hex")
       .toLowerCase();
 
-    // Step 2: Query Ethereum Blockchain using documentHash (Authoritative Source)
-    const chainRecord = await BlockchainService.getCertificateByDocHash(uploadedHash);
+    // Step 2: Try blockchain first (authoritative source)
+    let chainRecord = null;
+    let blockchainOnline = false;
 
-    if (!chainRecord.existsOnChain) {
+    try {
+      chainRecord = await BlockchainService.getCertificateByDocHash(uploadedHash);
+      // If we got a response without an error field, blockchain is online
+      blockchainOnline = !chainRecord.error;
+    } catch (bcError) {
+      console.warn("[Verify] Blockchain unreachable:", bcError.message);
+      blockchainOnline = false;
+      chainRecord = { existsOnChain: false, error: bcError.message };
+    }
+
+    // Step 3: If blockchain confirms the hash — return blockchain-verified result
+    if (blockchainOnline && chainRecord.existsOnChain) {
+      if (chainRecord.isRevoked) {
+        return res.status(200).json({
+          success: true,
+          verified: false,
+          status: "REVOKED",
+          verificationSource: "BLOCKCHAIN",
+          message: "This certificate hash exists on-chain but has been REVOKED by the issuing institution.",
+          uploadedDocumentHash: uploadedHash,
+          blockchainProof: chainRecord,
+        });
+      }
+
+      // Fetch MongoDB metadata for display
+      const dbCert = await Certificate.findOne({ documentHash: uploadedHash });
+
+      return res.status(200).json({
+        success: true,
+        verified: true,
+        status: "AUTHENTIC",
+        verificationSource: "BLOCKCHAIN",
+        message: "Certificate verified directly against the Ethereum blockchain smart contract.",
+        uploadedDocumentHash: uploadedHash,
+        blockchainDocumentHash: chainRecord.documentHash,
+        certificate: {
+          studentName: dbCert?.studentName || chainRecord.studentName,
+          course: dbCert?.course || chainRecord.course,
+          institution: dbCert?.institution || chainRecord.institution,
+          issueDate: dbCert?.issueDate || chainRecord.issueDate,
+          grade: dbCert?.grade || "Pass",
+          certificateId: dbCert?.certificateId || chainRecord.certificateId || null,
+        },
+        blockchainProof: {
+          issuerWallet: chainRecord.issuerWallet,
+          timestamp: chainRecord.timestamp,
+          transactionHash: dbCert?.transactionHash || null,
+        },
+      });
+    }
+
+    // Step 4: Blockchain offline or hash not on-chain —
+    //         Fall back to MongoDB database verification
+    const dbCert = await Certificate.findOne({ documentHash: uploadedHash });
+
+    if (!dbCert) {
+      // Not found anywhere — definitely invalid
       return res.status(200).json({
         success: true,
         verified: false,
         status: "INVALID",
         reason: "HASH_NOT_FOUND",
-        message: "The uploaded PDF does not match any certificate anchored on the Ethereum blockchain.",
+        verificationSource: blockchainOnline ? "BLOCKCHAIN" : "DATABASE",
+        message: blockchainOnline
+          ? "The uploaded PDF hash is not registered on the Ethereum blockchain."
+          : "The uploaded PDF hash was not found in the certificate database.",
         uploadedDocumentHash: uploadedHash,
       });
     }
 
-    if (chainRecord.isRevoked) {
+    // Found in MongoDB — check if it was revoked
+    if (dbCert.blockchainStatus === "Revoked") {
       return res.status(200).json({
         success: true,
         verified: false,
         status: "REVOKED",
-        message: "This certificate was anchored on the blockchain but has since been REVOKED.",
+        verificationSource: "DATABASE",
+        message: "This certificate exists in the database but has been marked as REVOKED.",
         uploadedDocumentHash: uploadedHash,
-        blockchainProof: chainRecord,
       });
     }
 
-    // Step 3: Fetch off-chain MongoDB metadata for display
-    const dbCert = await Certificate.findOne({ documentHash: uploadedHash });
-
+    // Found in MongoDB and not revoked — verified via database
     return res.status(200).json({
       success: true,
       verified: true,
       status: "AUTHENTIC",
-      message: "Document verified successfully against the Ethereum blockchain.",
+      verificationSource: blockchainOnline ? "DATABASE_PENDING" : "DATABASE",
+      message: blockchainOnline
+        ? "Certificate found in the institutional database. Blockchain anchoring is pending confirmation."
+        : "Certificate found and verified in the institutional database. (Blockchain node offline — database verification used.)",
       uploadedDocumentHash: uploadedHash,
-      blockchainDocumentHash: chainRecord.documentHash,
       certificate: {
-        studentName: dbCert?.studentName || chainRecord.studentName,
-        course: dbCert?.course || chainRecord.course,
-        institution: dbCert?.institution || chainRecord.institution,
-        issueDate: dbCert?.issueDate || chainRecord.issueDate,
-        grade: dbCert?.grade || "Pass",
-        certificateId: chainRecord.certificateId || dbCert?.certificateId || null,
+        studentName: dbCert.studentName,
+        course: dbCert.course,
+        institution: dbCert.institution,
+        issueDate: dbCert.issueDate,
+        grade: dbCert.grade || "Pass",
+        certificateId: dbCert.certificateId || null,
       },
       blockchainProof: {
-        issuerWallet: chainRecord.issuerWallet,
-        timestamp: chainRecord.timestamp,
-        transactionHash: dbCert?.transactionHash || null,
+        transactionHash: dbCert.transactionHash || null,
+        blockchainStatus: dbCert.blockchainStatus,
       },
     });
   } catch (error) {
@@ -309,13 +387,33 @@ const deleteCertificate = async (req, res, next) => {
  */
 const downloadPDF = async (req, res, next) => {
   try {
-    const certIdParam = req.params.certificateId.trim().toUpperCase();
-    const certificate = await Certificate.findOne({ certificateId: certIdParam });
+    const param = req.params.certificateId.trim();
+    let certificate;
 
-    if (!certificate) {
-      return res.status(404).json({ success: false, message: `Certificate '${certIdParam}' not found.` });
+    // Accept MongoDB _id (24-char hex) or human-readable certificateId
+    // MUST use .select("+originalPdf") because originalPdf has select:false by default
+    if (/^[0-9a-fA-F]{24}$/.test(param)) {
+      certificate = await Certificate.findById(param).select("+originalPdf +originalPdfName");
+    } else {
+      certificate = await Certificate.findOne({ certificateId: param.toUpperCase() }).select("+originalPdf +originalPdfName");
     }
 
+    if (!certificate) {
+      return res.status(404).json({ success: false, message: `Certificate '${param}' not found.` });
+    }
+
+    const downloadFilename = certificate.originalPdfName || `Certificate-${certificate.certificateId || param}.pdf`;
+
+    // ✅ PRIMARY PATH: Serve the EXACT original PDF bytes (same hash as on blockchain)
+    if (certificate.originalPdf && certificate.originalPdf.length > 0) {
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${downloadFilename}"`);
+      res.setHeader("Content-Length", certificate.originalPdf.length);
+      return res.end(certificate.originalPdf);
+    }
+
+    // ⚠️ FALLBACK: Legacy certificate — generate PDF (hash will NOT match on-chain)
+    console.warn(`[downloadPDF] No original PDF stored for '${param}' — generating fallback PDF (hash mismatch expected).`);
     const verificationUrl = `${req.protocol}://${req.get("host")}/verify`;
     const pdfDoc = await generateCertificatePDFStream(certificate, verificationUrl);
 
@@ -335,11 +433,18 @@ const downloadPDF = async (req, res, next) => {
  */
 const getQRCode = async (req, res, next) => {
   try {
-    const certIdParam = req.params.certificateId.trim().toUpperCase();
-    const certificate = await Certificate.findOne({ certificateId: certIdParam });
+    const param = req.params.certificateId.trim();
+    let certificate;
+
+    // Accept MongoDB _id or human-readable certificateId
+    if (/^[0-9a-fA-F]{24}$/.test(param)) {
+      certificate = await Certificate.findById(param);
+    } else {
+      certificate = await Certificate.findOne({ certificateId: param.toUpperCase() });
+    }
 
     if (!certificate) {
-      return res.status(404).json({ success: false, message: `Certificate '${certIdParam}' not found.` });
+      return res.status(404).json({ success: false, message: `Certificate '${param}' not found.` });
     }
 
     const verificationUrl = `${req.protocol}://${req.get("host")}/verify`;
@@ -347,7 +452,7 @@ const getQRCode = async (req, res, next) => {
 
     res.json({
       success: true,
-      certificateId: certificate.certificateId,
+      certificateId: certificate.certificateId || certificate._id,
       qrCodeDataUrl: qrDataUrl,
       verificationUrl,
     });

@@ -1,18 +1,47 @@
-import API from "./api";
+import api from "./api";
 
 export const authService = {
-  login: async (credentials) => {
-    const response = await API.post("/auth/login", credentials);
-    return response.data;
+  async login(credentials) {
+    const response = await api.post("/auth/login", credentials);
+    // Backend returns: { success, data: { _id, name, email, role, token } }
+    const { data } = response.data;
+    if (data?.token) {
+      localStorage.setItem("cert_token", data.token);
+      localStorage.setItem("cert_user", JSON.stringify({
+        _id: data._id,
+        name: data.name,
+        email: data.email,
+        role: data.role,
+        institution: data.institution,
+      }));
+    }
+    return response.data; // { success, data }
   },
 
-  register: async (userData) => {
-    const response = await API.post("/auth/register", userData);
-    return response.data;
+  async register(userData) {
+    const response = await api.post("/auth/register", userData);
+    // Backend returns: { success, data: { _id, name, email, role, token } }
+    const { data } = response.data;
+    if (data?.token) {
+      localStorage.setItem("cert_token", data.token);
+      localStorage.setItem("cert_user", JSON.stringify({
+        _id: data._id,
+        name: data.name,
+        email: data.email,
+        role: data.role,
+        institution: data.institution,
+      }));
+    }
+    return response.data; // { success, data }
   },
 
-  getCurrentUser: async () => {
-    const response = await API.get("/auth/me");
-    return response.data;
+  logout() {
+    localStorage.removeItem("cert_token");
+    localStorage.removeItem("cert_user");
+  },
+
+  getCurrentUser() {
+    const userStr = localStorage.getItem("cert_user");
+    return userStr ? JSON.parse(userStr) : null;
   },
 };
