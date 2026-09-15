@@ -1,9 +1,7 @@
 import React, { useState } from "react";
-import Sidebar from "../components/Sidebar";
-import LoadingSpinner from "../components/LoadingSpinner";
 import { certificateService } from "../services/certificateService";
-import { ShieldCheck, CheckCircle2, XCircle, AlertTriangle, UploadCloud, FileText, ChevronDown, ChevronUp, User, Building, Calendar, Award, Cpu } from "lucide-react";
-import { formatDate, shortenAddress } from "../utils/formatters";
+import { formatDate } from "../utils/formatters";
+import toast from "react-hot-toast";
 
 const VerifyCertificate = () => {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -11,6 +9,7 @@ const VerifyCertificate = () => {
   const [loading, setLoading] = useState(false);
   const [verificationResult, setVerificationResult] = useState(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [copiedTx, setCopiedTx] = useState(false);
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -19,7 +18,7 @@ const VerifyCertificate = () => {
         setSelectedFile(file);
         setVerificationResult(null);
       } else {
-        alert("Please select a valid PDF file");
+        toast.error("Please select a valid PDF file");
       }
     }
   };
@@ -33,7 +32,7 @@ const VerifyCertificate = () => {
         setSelectedFile(file);
         setVerificationResult(null);
       } else {
-        alert("Please drop a valid PDF file");
+        toast.error("Please drop a valid PDF file");
       }
     }
   };
@@ -48,178 +47,224 @@ const VerifyCertificate = () => {
     setIsDragOver(false);
   };
 
+  const clearLoadedFile = () => {
+    setSelectedFile(null);
+    setVerificationResult(null);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedFile) return;
+    if (!selectedFile) {
+      toast.error("Please upload a PDF certificate first!");
+      return;
+    }
 
     try {
       setLoading(true);
       setVerificationResult(null);
       const res = await certificateService.verifyCertificate(selectedFile);
       setVerificationResult(res);
+
+      if (res.status === "AUTHENTIC") {
+        toast.success("✓ Certificate Authentic & Verified on Blockchain!");
+      } else if (res.status === "REVOKED") {
+        toast.error("⚠ Certificate Has Been Revoked!");
+      } else {
+        toast.error("✗ Invalid / Tampered Certificate!");
+      }
     } catch (error) {
       console.error("Verification error:", error);
+      toast.error("Failed to communicate with verification backend.");
       setVerificationResult({
         verified: false,
-        status: "VERIFICATION_ERROR",
-        message: error.response?.data?.message || "Failed to communicate with verification backend.",
+        status: "INVALID",
+        message: error.response?.data?.message || "Document SHA-256 not found on blockchain.",
       });
     } finally {
       setLoading(false);
     }
   };
 
+  const copyText = (text) => {
+    navigator.clipboard.writeText(text);
+    setCopiedTx(true);
+    toast.success("Copied to clipboard!");
+    setTimeout(() => setCopiedTx(false), 2000);
+  };
+
   return (
-    <div className="flex">
-      <Sidebar />
-      <main className="flex-1 p-6 md:p-8 max-w-4xl mx-auto space-y-8">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-100 flex items-center gap-3">
-            <ShieldCheck className="w-8 h-8 text-indigo-400" /> Blockchain PDF Verification Engine
+    <div className="bg-[#0d141e] text-[#dce3f1] font-['Inter',sans-serif] min-h-screen py-12 px-6">
+      <div className="max-w-4xl mx-auto space-y-8">
+        {/* Page Header */}
+        <div className="text-center space-y-3">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-[#19202a] border border-[#3c4a42]/40 shadow-sm">
+            <span className="material-symbols-outlined text-[16px] text-[#4edea3]">verified_user</span>
+            <span className="font-mono text-xs text-[#4edea3] tracking-wider uppercase">ETHEREUM PDF VERIFICATION ENGINE</span>
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-bold text-[#dce3f1] tracking-tight">
+            Verify Certificate Authenticity
           </h1>
-          <p className="text-slate-400 text-sm mt-1">
-            Upload the original certificate PDF to verify its authenticity directly against the Ethereum blockchain.
+          <p className="text-sm text-[#bbcabf] max-w-xl mx-auto">
+            Upload the official PDF certificate. The SHA-256 digest is computed in client memory and queried directly against Ethereum smart contracts.
           </p>
         </div>
 
-        {/* PDF Upload Card */}
-        <form onSubmit={handleSubmit} className="glass-panel p-6 rounded-2xl border border-slate-700/80 shadow-2xl space-y-6">
+        {/* PDF Ingestion Form */}
+        <form onSubmit={handleSubmit} className="bg-[#151c26] p-8 rounded-xl border border-[#3c4a42]/40 space-y-6 shadow-xl">
+          <div className="flex items-center justify-between pb-2 border-b border-[#3c4a42]/30">
+            <h3 className="text-base font-semibold text-[#dce3f1]">Document Ingestion</h3>
+            <span className="px-2.5 py-0.5 rounded bg-[#19202a] border border-[#3c4a42]/40 font-mono text-xs text-[#4edea3] flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-[#4edea3] animate-pulse"></span>
+              Client-Side SHA-256 Engine
+            </span>
+          </div>
+
           <div
             onDrop={handleDrop}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
-            className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all cursor-pointer ${
+            onClick={() => document.getElementById("verifyPagePdfInput").click()}
+            className={`border-2 border-dashed rounded-xl p-8 text-center bg-[#0d141e]/50 cursor-pointer dropzone-pulse transition-all ${
               isDragOver
-                ? "border-indigo-400 bg-indigo-500/10"
+                ? "border-[#4edea3] bg-[#10b981]/10"
                 : selectedFile
-                ? "border-emerald-500/60 bg-emerald-950/10"
-                : "border-slate-700 hover:border-slate-500 bg-slate-900/40"
+                ? "border-[#4edea3]/80 bg-[#10b981]/5"
+                : "border-[#3c4a42]/60 hover:border-[#4edea3]/70"
             }`}
-            onClick={() => document.getElementById("pdfInput").click()}
           >
+            <div className="w-14 h-14 mx-auto rounded-full bg-[#232a35] border border-[#3c4a42]/50 flex items-center justify-center text-[#4edea3] dropzone-icon transition-transform">
+              <span className="material-symbols-outlined text-3xl">picture_as_pdf</span>
+            </div>
+            <div className="mt-4">
+              <p className="text-sm font-medium text-[#dce3f1]">
+                {selectedFile ? selectedFile.name : "Drag & drop your certificate PDF here, or browse"}
+              </p>
+              <p className="text-xs text-[#bbcabf] mt-1">
+                Zero-Knowledge Privacy: Raw PDF file is never stored or sent across the network
+              </p>
+            </div>
             <input
-              id="pdfInput"
+              id="verifyPagePdfInput"
               type="file"
               accept="application/pdf"
               onChange={handleFileChange}
               className="hidden"
             />
-
-            {selectedFile ? (
-              <div className="flex items-center justify-center gap-3">
-                <FileText className="w-10 h-10 text-emerald-400 shrink-0" />
-                <div className="text-left">
-                  <p className="text-slate-100 font-semibold text-sm truncate max-w-md">{selectedFile.name}</p>
-                  <p className="text-slate-400 text-xs font-mono">
-                    {(selectedFile.size / 1024).toFixed(1)} KB • PDF Document Ready
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <UploadCloud className="w-12 h-12 text-indigo-400 mx-auto opacity-80" />
-                <div>
-                  <p className="text-slate-200 font-medium text-sm">
-                    Drop your certificate PDF here, or <span className="text-indigo-400 underline">browse</span>
-                  </p>
-                  <p className="text-slate-500 text-xs mt-1">Only official PDF files supported (Max 10 MB)</p>
-                </div>
-              </div>
-            )}
           </div>
+
+          {selectedFile && (
+            <div className="p-3.5 rounded-lg bg-[#19202a] border border-[#4edea3]/30 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 overflow-hidden">
+                <span className="material-symbols-outlined text-[#4edea3] text-[22px]">description</span>
+                <div className="min-w-0 font-mono text-xs">
+                  <div className="font-semibold text-[#dce3f1] truncate">{selectedFile.name}</div>
+                  <div className="text-[#bbcabf] mt-0.5">{(selectedFile.size / 1024).toFixed(1)} KB • PDF Document Loaded</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={clearLoadedFile}
+                className="px-2.5 py-1 rounded bg-[#232a35] hover:bg-[#2e3540] text-[#ffb4ab] text-xs font-mono border border-[#3c4a42]/40"
+              >
+                Clear
+              </button>
+            </div>
+          )}
 
           <button
             type="submit"
             disabled={!selectedFile || loading}
-            className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm shadow-lg shadow-indigo-600/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full py-3.5 bg-[#10b981] hover:bg-[#45dfa4] text-[#00422b] font-semibold text-sm rounded-lg flex items-center justify-center gap-2 shadow-[0_4px_16px_rgba(16,185,129,0.25)] transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer btn-shine"
           >
-            {loading ? "Calculating SHA-256 & Querying Blockchain..." : "Verify PDF Authenticity"}
+            <span className="material-symbols-outlined text-[20px]">
+              {loading ? "hourglass_empty" : "fact_check"}
+            </span>
+            <span>{loading ? "Computing SHA-256 & Checking Ethereum Node..." : "Verify Certificate Authenticity"}</span>
           </button>
         </form>
 
-        {loading && <LoadingSpinner label="Computing SHA-256 Hash & Checking Ethereum Node..." />}
-
+        {/* Verification Result Output */}
         {verificationResult && (
-          <div className="space-y-6 animate-fadeIn">
+          <div className="space-y-6">
             {/* AUTHENTIC RESULT */}
             {verificationResult.status === "AUTHENTIC" && (
-              <div className="glass-panel p-8 rounded-2xl border border-emerald-500/50 bg-emerald-950/20 shadow-2xl space-y-6">
-                <div className="flex items-start gap-4 pb-6 border-b border-emerald-500/20">
-                  <CheckCircle2 className="w-12 h-12 text-emerald-400 shrink-0 mt-1" />
+              <div className="p-8 rounded-xl bg-[#151c26] border border-[#4edea3]/50 shadow-[0_0_25px_rgba(16,185,129,0.15)] space-y-6">
+                <div className="flex items-start gap-4 pb-6 border-b border-[#3c4a42]/30">
+                  <span className="material-symbols-outlined text-4xl text-[#4edea3]">verified</span>
                   <div>
-                    <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-mono font-bold uppercase tracking-wider border border-emerald-500/30">
+                    <span className="px-3 py-1 rounded bg-[#10b981]/20 text-[#4edea3] border border-[#4edea3]/30 text-xs font-mono font-bold uppercase">
                       ✓ Authentic Certificate
                     </span>
-                    <h2 className="text-2xl font-black text-slate-100 mt-2">Document Verified Successfully</h2>
-                    <p className="text-slate-300 text-sm mt-1">
-                      The uploaded PDF matches the cryptographic certificate record anchored on the Ethereum blockchain.
+                    <h2 className="text-2xl font-bold text-[#dce3f1] mt-2">Document Verified Successfully</h2>
+                    <p className="text-xs text-[#bbcabf] mt-1">
+                      The uploaded PDF hash matches the cryptographically signed record anchored on Ethereum.
                     </p>
                   </div>
                 </div>
 
-                {/* Certificate Information Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm pt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-xs pt-2">
                   <div className="space-y-1">
-                    <span className="text-xs text-slate-400 flex items-center gap-1 font-medium">
-                      <User className="w-4 h-4 text-emerald-400" /> Student Name
-                    </span>
-                    <p className="text-slate-100 font-bold text-base">{verificationResult.certificate.studentName}</p>
+                    <span className="text-[#bbcabf] font-medium">Student Name</span>
+                    <p className="text-[#dce3f1] font-bold text-base">{verificationResult.certificate?.studentName}</p>
                   </div>
 
                   <div className="space-y-1">
-                    <span className="text-xs text-slate-400 flex items-center gap-1 font-medium">
-                      <Award className="w-4 h-4 text-emerald-400" /> Course / Degree
-                    </span>
-                    <p className="text-slate-100 font-bold text-base">{verificationResult.certificate.course}</p>
+                    <span className="text-[#bbcabf] font-medium">Course / Degree</span>
+                    <p className="text-[#dce3f1] font-bold text-base">{verificationResult.certificate?.course}</p>
                   </div>
 
                   <div className="space-y-1">
-                    <span className="text-xs text-slate-400 flex items-center gap-1 font-medium">
-                      <Building className="w-4 h-4 text-emerald-400" /> Institution
-                    </span>
-                    <p className="text-slate-100 font-semibold">{verificationResult.certificate.institution}</p>
+                    <span className="text-[#bbcabf] font-medium">Issuing Institution</span>
+                    <p className="text-[#dce3f1] font-semibold">{verificationResult.certificate?.institution}</p>
                   </div>
 
                   <div className="space-y-1">
-                    <span className="text-xs text-slate-400 flex items-center gap-1 font-medium">
-                      <Calendar className="w-4 h-4 text-emerald-400" /> Issue Date
-                    </span>
-                    <p className="text-slate-200 font-mono">{formatDate(verificationResult.certificate.issueDate)}</p>
+                    <span className="text-[#bbcabf] font-medium">Issue Date</span>
+                    <p className="text-[#dce3f1] font-mono">{formatDate(verificationResult.certificate?.issueDate)}</p>
                   </div>
                 </div>
 
-                {/* Expandable Advanced Blockchain Proof */}
-                <div className="border-t border-slate-800 pt-4">
+                {/* Advanced Proof details */}
+                <div className="border-t border-[#3c4a42]/30 pt-4">
                   <button
+                    type="button"
                     onClick={() => setShowAdvanced(!showAdvanced)}
-                    className="flex items-center gap-2 text-xs font-mono text-indigo-400 hover:text-indigo-300 font-semibold"
+                    className="flex items-center gap-1.5 font-mono text-xs text-[#4edea3] hover:underline font-semibold"
                   >
-                    {showAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                    Advanced Blockchain Proof Details
+                    <span className="material-symbols-outlined text-[16px]">
+                      {showAdvanced ? "expand_less" : "expand_more"}
+                    </span>
+                    Advanced Cryptographic & Blockchain Proof
                   </button>
 
                   {showAdvanced && (
-                    <div className="mt-4 p-4 rounded-xl bg-slate-900/90 border border-slate-800 text-xs font-mono space-y-2 text-slate-300 animate-fadeIn">
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">Document SHA-256 Hash:</span>
-                        <span className="text-emerald-400 break-all">{verificationResult.uploadedDocumentHash}</span>
+                    <div className="mt-4 p-4 rounded-xl bg-[#0d141e] border border-[#3c4a42]/40 font-mono text-xs space-y-2 text-[#dce3f1]">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[#bbcabf]">Document SHA-256 Digest:</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[#4edea3] truncate max-w-xs">{verificationResult.uploadedDocumentHash}</span>
+                          <button onClick={() => copyText(verificationResult.uploadedDocumentHash)} className="text-[#bbcabf] hover:text-[#4edea3]">
+                            <span className="material-symbols-outlined text-[15px]">content_copy</span>
+                          </button>
+                        </div>
                       </div>
+
                       {verificationResult.blockchainProof?.issuerWallet && (
                         <div className="flex justify-between">
-                          <span className="text-slate-500">Issuer Wallet Address:</span>
-                          <span className="text-slate-300">{verificationResult.blockchainProof.issuerWallet}</span>
+                          <span className="text-[#bbcabf]">Issuer Wallet Address:</span>
+                          <span>{verificationResult.blockchainProof.issuerWallet}</span>
                         </div>
                       )}
+
                       {verificationResult.blockchainProof?.transactionHash && (
-                        <div className="flex justify-between">
-                          <span className="text-slate-500">Transaction Hash:</span>
-                          <span className="text-indigo-400">{verificationResult.blockchainProof.transactionHash}</span>
-                        </div>
-                      )}
-                      {verificationResult.certificate?.certificateId && (
-                        <div className="flex justify-between">
-                          <span className="text-slate-500">Certificate Reference ID:</span>
-                          <span className="text-slate-400">{verificationResult.certificate.certificateId}</span>
+                        <div className="flex justify-between items-center">
+                          <span className="text-[#bbcabf]">Ethereum Tx Hash:</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[#6ffbbe]">{verificationResult.blockchainProof.transactionHash}</span>
+                            <button onClick={() => copyText(verificationResult.blockchainProof.transactionHash)} className="text-[#bbcabf] hover:text-[#4edea3]">
+                              <span className="material-symbols-outlined text-[15px]">content_copy</span>
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -228,21 +273,21 @@ const VerifyCertificate = () => {
               </div>
             )}
 
-            {/* INVALID / TAMPERED RESULT */}
+            {/* INVALID RESULT */}
             {verificationResult.status === "INVALID" && (
-              <div className="glass-panel p-8 rounded-2xl border border-red-500/50 bg-red-950/20 shadow-2xl space-y-4">
+              <div className="p-8 rounded-xl bg-[#151c26] border border-[#ffb4ab]/50 shadow-xl space-y-4">
                 <div className="flex items-start gap-4">
-                  <XCircle className="w-12 h-12 text-red-400 shrink-0 mt-1" />
+                  <span className="material-symbols-outlined text-4xl text-[#ffb4ab]">gpp_bad</span>
                   <div>
-                    <span className="px-3 py-1 rounded-full bg-red-500/20 text-red-400 text-xs font-mono font-bold uppercase tracking-wider border border-red-500/30">
+                    <span className="px-3 py-1 rounded bg-[#93000a]/20 text-[#ffb4ab] border border-[#ffb4ab]/30 text-xs font-mono font-bold uppercase">
                       ✗ Invalid / Tampered Certificate
                     </span>
-                    <h2 className="text-2xl font-black text-slate-100 mt-2">Verification Failed</h2>
-                    <p className="text-slate-300 text-sm mt-1">
-                      The SHA-256 hash of this PDF document does not match any certificate anchored on the Ethereum blockchain.
+                    <h2 className="text-2xl font-bold text-[#dce3f1] mt-2">Verification Failed</h2>
+                    <p className="text-xs text-[#bbcabf] mt-1 leading-relaxed">
+                      The SHA-256 hash of this PDF document does not match any certificate anchored on the Ethereum smart contract registry.
                     </p>
-                    <p className="text-red-400/80 text-xs mt-2 font-mono">
-                      Calculated Hash: {verificationResult.uploadedDocumentHash}
+                    <p className="text-[#ffb4ab] font-mono text-xs mt-3 break-all bg-[#0d141e] p-2.5 rounded border border-[#3c4a42]/40">
+                      Calculated SHA-256 Digest: {verificationResult.uploadedDocumentHash || "UNREGISTERED"}
                     </p>
                   </div>
                 </div>
@@ -251,16 +296,16 @@ const VerifyCertificate = () => {
 
             {/* REVOKED RESULT */}
             {verificationResult.status === "REVOKED" && (
-              <div className="glass-panel p-8 rounded-2xl border border-amber-500/50 bg-amber-950/20 shadow-2xl space-y-4">
+              <div className="p-8 rounded-xl bg-[#151c26] border border-yellow-500/50 shadow-xl space-y-4">
                 <div className="flex items-start gap-4">
-                  <AlertTriangle className="w-12 h-12 text-amber-400 shrink-0 mt-1" />
+                  <span className="material-symbols-outlined text-4xl text-yellow-400">warning</span>
                   <div>
-                    <span className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 text-xs font-mono font-bold uppercase tracking-wider border border-amber-500/30">
+                    <span className="px-3 py-1 rounded bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 text-xs font-mono font-bold uppercase">
                       ⚠ Certificate Revoked
                     </span>
-                    <h2 className="text-2xl font-black text-slate-100 mt-2">Certificate Has Been Revoked</h2>
-                    <p className="text-slate-300 text-sm mt-1">
-                      This PDF document was previously anchored on the blockchain, but the issuing institution has officially revoked it.
+                    <h2 className="text-2xl font-bold text-[#dce3f1] mt-2">Certificate Has Been Revoked</h2>
+                    <p className="text-xs text-[#bbcabf] mt-1 leading-relaxed">
+                      This PDF document was previously anchored on the blockchain, but the issuing authority has officially revoked it on-chain.
                     </p>
                   </div>
                 </div>
@@ -268,7 +313,7 @@ const VerifyCertificate = () => {
             )}
           </div>
         )}
-      </main>
+      </div>
     </div>
   );
 };

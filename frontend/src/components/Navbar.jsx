@@ -1,15 +1,13 @@
-import React, { useContext, useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { ThemeContext } from "../context/ThemeContext";
-import { ShieldCheck, LogOut, LayoutDashboard, PlusCircle, Search, Award, Sun, Moon, Wallet } from "lucide-react";
 import { shortenAddress } from "../utils/formatters";
 import toast from "react-hot-toast";
 
 const Navbar = () => {
   const { user, isAuthenticated, logout, isAdmin } = useAuth();
-  const { theme, toggleTheme } = useContext(ThemeContext);
   const navigate = useNavigate();
+  const location = useLocation();
   const [walletAddress, setWalletAddress] = useState("");
 
   useEffect(() => {
@@ -41,123 +39,128 @@ const Navbar = () => {
   };
 
   const isStudent = user?.role === "Student";
+  const isActive = (path) => location.pathname === path;
 
   return (
-    <nav className="sticky top-0 z-50 glass-panel border-b border-slate-700/50 px-6 py-4">
-      <div className="max-w-7xl mx-auto flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-3 group">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/30 group-hover:scale-105 transition-transform">
-            <ShieldCheck className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <span className="text-xl font-extrabold tracking-tight gradient-text">CertiChain</span>
-            <span className="block text-[10px] uppercase tracking-widest text-slate-400 font-semibold">
-              Blockchain Verified
-            </span>
-          </div>
+    <header className="sticky top-0 z-50 bg-[#0d141e]/90 backdrop-blur-md border-b border-[#3c4a42]/30 w-full transition-all duration-300">
+      <div className="max-w-7xl mx-auto px-6 w-full flex items-center justify-between h-16">
+        {/* Brand Logo Anchor */}
+        <Link to="/" className="text-lg font-semibold tracking-tight text-[#dce3f1] flex items-center gap-2 active:scale-[0.98] transition-transform group">
+          <span className="w-8 h-8 rounded-lg bg-[#232a35] border border-[#3c4a42]/50 flex items-center justify-center text-[#4edea3] group-hover:border-[#4edea3]/60 group-hover:shadow-[0_0_12px_rgba(16,185,129,0.3)] transition-all">
+            <span className="material-symbols-outlined text-[20px] group-hover:scale-110 transition-transform">verified_user</span>
+          </span>
+          <span className="tracking-wide font-bold">VARUTHA</span>
         </Link>
 
-        {/* Navigation Links */}
-        <div className="hidden md:flex items-center gap-6 text-sm font-medium">
-          <Link to="/" className="text-slate-300 hover:text-indigo-400 transition-colors">
-            Home
+        {/* Desktop Navigation Links */}
+        <nav className="hidden md:flex items-center space-x-6 text-sm font-medium">
+          <Link
+            to="/"
+            className={`transition-colors duration-150 py-1 hover:text-[#4edea3] ${
+              isActive("/") ? "text-[#4edea3] border-b-2 border-[#4edea3]" : "text-[#bbcabf]"
+            }`}
+          >
+            How It Works
           </Link>
 
-          {/* Public or Admin can see Verify Certificate; Student cannot */}
+          {/* Public or Admin can see Verify Certificate */}
           {(!isAuthenticated || isAdmin) && (
-            <Link to="/verify" className="flex items-center gap-1.5 text-slate-300 hover:text-indigo-400 transition-colors">
-              <Search className="w-4 h-4" />
-              Verify Certificate
+            <Link
+              to="/verify"
+              className={`transition-colors duration-150 py-1 hover:text-[#4edea3] ${
+                isActive("/verify") ? "text-[#4edea3] border-b-2 border-[#4edea3]" : "text-[#bbcabf]"
+              }`}
+            >
+              Verify
             </Link>
           )}
 
           {isAuthenticated && (
             <>
-              {/* Admin Links */}
               {isAdmin && (
                 <>
-                  <Link to="/dashboard" className="flex items-center gap-1.5 text-slate-300 hover:text-indigo-400 transition-colors">
-                    <LayoutDashboard className="w-4 h-4" />
+                  <Link
+                    to="/dashboard"
+                    className={`transition-colors duration-150 py-1 hover:text-[#4edea3] ${
+                      isActive("/dashboard") ? "text-[#4edea3] border-b-2 border-[#4edea3]" : "text-[#bbcabf]"
+                    }`}
+                  >
                     Dashboard
                   </Link>
-                  <Link to="/issue" className="flex items-center gap-1.5 text-indigo-400 hover:text-indigo-300 font-semibold transition-colors">
-                    <PlusCircle className="w-4 h-4" />
+                  <Link
+                    to="/issue"
+                    className={`transition-colors duration-150 py-1 hover:text-[#4edea3] ${
+                      isActive("/issue") ? "text-[#4edea3] border-b-2 border-[#4edea3]" : "text-[#bbcabf]"
+                    }`}
+                  >
                     Issue Certificate
                   </Link>
-                  <Link to="/certificates" className="flex items-center gap-1.5 text-slate-300 hover:text-indigo-400 transition-colors">
-                    <Award className="w-4 h-4" />
+                  <Link
+                    to="/certificates"
+                    className={`transition-colors duration-150 py-1 hover:text-[#4edea3] ${
+                      isActive("/certificates") ? "text-[#4edea3] border-b-2 border-[#4edea3]" : "text-[#bbcabf]"
+                    }`}
+                  >
                     All Certificates
                   </Link>
                 </>
               )}
 
-              {/* Student Links */}
               {isStudent && (
-                <Link to="/certificates" className="flex items-center gap-1.5 text-indigo-400 hover:text-indigo-300 font-semibold transition-colors">
-                  <Award className="w-4 h-4" />
-                  My Certificates
+                <Link
+                  to="/certificates"
+                  className={`transition-colors duration-150 py-1 hover:text-[#4edea3] ${
+                    isActive("/certificates") ? "text-[#4edea3] border-b-2 border-[#4edea3]" : "text-[#bbcabf]"
+                  }`}
+                >
+                  Student Locker
                 </Link>
               )}
             </>
           )}
-        </div>
+        </nav>
 
-        {/* Actions */}
+        {/* Trailing Actions */}
         <div className="flex items-center gap-3">
           {/* MetaMask Button */}
           <button
             onClick={connectMetaMask}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-mono font-semibold border transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-semibold border transition-all ${
               walletAddress
-                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                : "bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border-amber-500/30"
+                ? "bg-[#10b981]/10 text-[#4edea3] border-[#4edea3]/40"
+                : "bg-[#232a35] text-[#bbcabf] hover:border-[#4edea3]/60 hover:text-[#4edea3] border-[#3c4a42]/60"
             }`}
           >
-            <Wallet className="w-3.5 h-3.5" />
-            {walletAddress ? shortenAddress(walletAddress, 4) : "MetaMask"}
-          </button>
-
-          <button
-            onClick={toggleTheme}
-            className="p-2 rounded-lg bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700 transition-all border border-slate-700"
-            title="Toggle theme"
-          >
-            {theme === "dark" ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
+            <span className="material-symbols-outlined text-[16px]">wallet</span>
+            <span>{walletAddress ? shortenAddress(walletAddress, 4) : "MetaMask"}</span>
           </button>
 
           {isAuthenticated ? (
             <div className="flex items-center gap-3">
               <div className="hidden sm:flex flex-col text-right">
-                <span className="text-xs font-semibold text-slate-200">{user?.name}</span>
-                <span className="text-[10px] text-indigo-400 font-mono font-medium">{user?.role}</span>
+                <span className="text-xs font-semibold text-[#dce3f1]">{user?.name}</span>
+                <span className="text-[10px] text-[#4edea3] font-mono font-medium">{user?.role}</span>
               </div>
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 text-xs font-medium transition-all"
+                className="px-3 py-1.5 rounded-lg bg-[#93000a]/20 text-[#ffb4ab] border border-[#ffb4ab]/30 hover:bg-[#93000a]/40 text-xs font-medium transition-all active:scale-95 flex items-center gap-1"
               >
-                <LogOut className="w-3.5 h-3.5" />
+                <span className="material-symbols-outlined text-[16px]">logout</span>
                 <span className="hidden sm:inline">Logout</span>
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-2">
-              <Link
-                to="/login"
-                className="px-3 py-1.5 rounded-xl text-slate-300 hover:text-white text-xs font-medium transition-colors"
-              >
-                Sign In
-              </Link>
-              <Link
-                to="/register"
-                className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/30 transition-all"
-              >
-                Register Admin
-              </Link>
-            </div>
+            <Link
+              to="/login"
+              className="px-4 py-2 text-xs font-semibold bg-[#232a35] text-[#dce3f1] border border-[#3c4a42]/60 rounded-lg hover:border-[#4edea3]/60 hover:text-[#4edea3] hover:shadow-[0_0_15px_rgba(16,185,129,0.15)] transition-all duration-200 flex items-center gap-1.5 active:scale-95 btn-shine"
+            >
+              <span className="material-symbols-outlined text-[18px]">key</span>
+              <span>Admin Login</span>
+            </Link>
           )}
         </div>
       </div>
-    </nav>
+    </header>
   );
 };
 
