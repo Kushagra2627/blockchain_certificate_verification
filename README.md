@@ -1,19 +1,39 @@
-# Blockchain Based Certificate Verification System
+# Blockchain-Based PDF Certificate Verification System
 
-A complete, production-ready full stack web application that allows educational institutions (Admins) to issue tamper-proof certificates anchored on the Ethereum blockchain via Solidity Smart Contracts while keeping off-chain records indexed in MongoDB. Students and third-party auditors can publicly verify any certificate's authenticity in real-time.
+A production-ready full-stack application that enables educational institutions to issue tamper-proof academic certificates. The exact original certificate PDF is hashed using **SHA-256** and anchored directly on the **Ethereum blockchain** via a **Solidity Smart Contract**, while metadata is indexed off-chain in **MongoDB**.
 
----
-
-## Tech Stack
-
-- **Smart Contract & Blockchain**: Solidity (`0.8.20`), Hardhat, Ethers.js (v6), Ganache, MetaMask
-- **Backend API**: Node.js, Express.js, MongoDB, Mongoose, JWT Authentication, bcryptjs, Helmet, Rate Limiter
-- **Frontend SPA**: React (Vite), Tailwind CSS, React Router v6, React Hook Form, React Hot Toast, Lucide Icons
-- **Testing**: Hardhat Test (Chai), Supertest, Jest
+Public verifiers can upload any certificate PDF file to verify its authenticity directly against the Ethereum blockchain in real-time — **without requiring any Certificate ID or user login**.
 
 ---
 
-## Directory Structure
+## 🚀 Architecture & Core Principles
+
+1. **Authoritative PDF Document Integrity Verification**:
+   - The original certificate PDF bytes are hashed using SHA-256 on the backend.
+   - The 32-byte hash (`bytes32 documentHash`) is stored on the Ethereum smart contract (`mapping(bytes32 => Certificate)`).
+   - Any single-byte modification (e.g. changing grade 7.8 → 9.8) alters the SHA-256 hash, causing Ethereum lookup to fail → **`INVALID / TAMPERED CERTIFICATE`**.
+
+2. **Public Verification (Zero Certificate ID Requirement)**:
+   - Verifiers upload the PDF file **ONLY** on the public `/verify` page.
+   - No login, Certificate ID, or text search is required to verify document authenticity.
+
+3. **Role-Based Access Control (RBAC)**:
+   - **Admin**: Full portal access (`/dashboard`, `/certificates`, `/issue`, `/verify`).
+   - **Student**: Access to `/certificates` to find and download their own official PDF certificate. Direct access to `/dashboard`, `/issue`, or `/verify` automatically redirects to `/certificates`.
+   - **Public**: Unauthenticated access to `/verify` (PDF-only upload verification) and `/login`.
+
+---
+
+## 🛠 Tech Stack
+
+- **Blockchain & Smart Contract**: Solidity (`0.8.20`), Hardhat, Ethers.js (`v6`), Ganache / Localhost Node, MetaMask
+- **Backend API**: Node.js, Express.js, MongoDB, Mongoose, Multer (PDF File Upload), Crypto (SHA-256), JWT Auth, Helmet, Rate Limiter
+- **Frontend SPA**: React (Vite), Vanilla / Tailwind CSS, React Router v6, React Hook Form, React Hot Toast, Lucide Icons
+- **Testing**: Hardhat Test (Chai), Supertest, Jest, MongoDB Memory Server
+
+---
+
+## 📁 Directory Structure
 
 ```
 blockchain-certificate-verification/
@@ -45,93 +65,45 @@ blockchain-certificate-verification/
 │   │   └── certificateRoutes.js
 │   ├── services/
 │   │   └── blockchainService.js
-│   ├── utils/
-│   │   └── generateToken.js
-│   ├── tests/
-│   │   ├── auth.test.js
-│   │   └── certificate.test.js
-│   ├── app.js
-│   ├── server.js
-│   └── package.json
+│   └── server.js
 └── frontend/
     ├── src/
     │   ├── components/
-    │   ├── context/
-    │   ├── hooks/
     │   ├── pages/
+    │   │   ├── VerifyCertificate.jsx
+    │   │   ├── IssueCertificate.jsx
+    │   │   ├── CertificateList.jsx
+    │   │   ├── Dashboard.jsx
+    │   │   ├── Login.jsx
+    │   │   └── Register.jsx
     │   ├── services/
-    │   ├── utils/
-    │   ├── App.jsx
-    │   └── main.jsx
-    ├── index.html
-    ├── tailwind.config.js
-    ├── vite.config.js
-    └── package.json
+    │   └── App.jsx
+    └── vite.config.js
 ```
 
 ---
 
-## Installation & Setup Instructions
+## ⚙️ How to Run Locally
 
-### 1. Root Smart Contract & Hardhat Setup
+### 1. Hardhat Blockchain Node
 ```bash
-# In project root:
-npm install
 npx hardhat compile
-```
-
-### 2. Run Local Hardhat Blockchain Node
-```bash
 npx hardhat node
-```
-
-### 3. Deploy Smart Contract to Local Node
-Open a new terminal window:
-```bash
+# In a second terminal window:
 npx hardhat run scripts/deploy.js --network localhost
 ```
-*Note: This generates `backend/config/contractDetails.json` containing the deployed contract address and ABI.*
 
-### 4. Setup Backend
+### 2. Express Backend
 ```bash
 cd backend
 npm install
-```
-Create `backend/.env` file:
-```env
-PORT=5000
-NODE_ENV=development
-MONGO_URI=mongodb://localhost:27017/blockchain_certificate_db
-JWT_SECRET=super_secret_jwt_key_certificate_verification_2026
-JWT_EXPIRE=30d
-RPC_URL=http://127.0.0.1:8545
-CONTRACT_ADDRESS=<DEPLOYED_CONTRACT_ADDRESS>
-ISSUER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-```
-Start backend:
-```bash
 npm run dev
 ```
 
-### 5. Setup Frontend
+### 3. React Frontend
 ```bash
-cd ../frontend
+cd frontend
 npm install
 npm run dev
 ```
-Open browser at `http://localhost:3000`.
-
----
-
-## Testing Commands
-
-- **Smart Contract Tests**: `npx hardhat test`
-- **Backend API Tests**: `cd backend && npm test`
-
----
-
-## End-to-End Workflow
-
-1. **Admin Registration**: Register account with role `Admin`.
-2. **Issue Certificate**: Navigate to `/issue`, enter Certificate ID and student details. Submit to trigger both MongoDB creation & Solidity contract execution.
-3. **Public Verification**: Navigate to `/verify`, enter Certificate ID, click "Verify". The engine queries both MongoDB and Ethereum Smart Contract to confirm validity.
+Open **`http://localhost:5173/verify`** to test public PDF upload verification!
