@@ -1,9 +1,11 @@
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { certificateService } from "../services/certificateService";
 import toast from "react-hot-toast";
 
 const Landing = () => {
+  const location = useLocation();
+
   // Verification Console State
   const [selectedFile, setSelectedFile] = useState(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -11,6 +13,19 @@ const Landing = () => {
   const [verificationResult, setVerificationResult] = useState(null);
   const [activeTab, setActiveTab] = useState("authentic"); // 'authentic' | 'invalid' | 'revoked'
   const [copiedTx, setCopiedTx] = useState(false);
+
+  // Smooth scroll to section if state contains scrollTo target
+  useEffect(() => {
+    if (location.state?.scrollTo) {
+      const targetId = location.state.scrollTo;
+      setTimeout(() => {
+        const elem = document.getElementById(targetId);
+        if (elem) {
+          elem.scrollIntoView({ behavior: "smooth" });
+        }
+      }, 100);
+    }
+  }, [location]);
 
   // File Upload Handlers
   const handleFileChange = (e) => {
@@ -111,11 +126,18 @@ const Landing = () => {
     setTimeout(() => setCopiedTx(false), 2000);
   };
 
+  const scrollToSection = (id) => {
+    const elem = document.getElementById(id);
+    if (elem) {
+      elem.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
   return (
     <div className="bg-[#0d141e] text-[#dce3f1] font-['Inter',sans-serif] antialiased selection:bg-[#10b981] selection:text-[#00422b] min-h-screen">
       {/* ================= HERO SECTION ================= */}
       <section className="relative overflow-hidden pt-12 pb-20 md:py-24 border-b border-[#3c4a42]/20 crypto-grid" id="hero-section">
-        {/* Subtle background glow */}
+        {/* Ambient background glows */}
         <div className="absolute top-1/4 left-10 w-96 h-96 bg-[#10b981]/15 rounded-full blur-3xl pointer-events-none -z-10 animate-mesh-pulse"></div>
         <div className="absolute bottom-10 right-1/4 w-80 h-80 bg-[#4edea3]/10 rounded-full blur-3xl pointer-events-none -z-10 animate-mesh-pulse" style={{ animationDelay: "4s" }}></div>
 
@@ -140,21 +162,21 @@ const Landing = () => {
 
               {/* CTAs */}
               <div className="pt-2 flex flex-wrap items-center gap-4">
-                <a
-                  href="#verify"
-                  className="px-6 py-3 bg-[#10b981] hover:bg-[#45dfa4] transition-all duration-200 text-[#00422b] text-sm font-semibold rounded-lg flex items-center gap-2 shadow-[0_4px_16px_rgba(16,185,129,0.25)] hover:shadow-[0_6px_22px_rgba(16,185,129,0.4)] active:scale-95 btn-shine"
+                <button
+                  onClick={() => scrollToSection("verify")}
+                  className="px-6 py-3 bg-[#10b981] hover:bg-[#45dfa4] transition-all duration-200 text-[#00422b] text-sm font-semibold rounded-lg flex items-center gap-2 shadow-[0_4px_16px_rgba(16,185,129,0.25)] hover:shadow-[0_6px_22px_rgba(16,185,129,0.4)] active:scale-95 btn-shine cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[18px]">file_open</span>
                   <span>Verify a Certificate</span>
-                </a>
+                </button>
 
-                <Link
-                  to="/certificates"
-                  className="px-6 py-3 bg-[#19202a] border border-[#3c4a42]/60 hover:bg-[#232a35] hover:border-[#4edea3]/60 transition-all duration-200 text-[#dce3f1] text-sm font-medium rounded-lg flex items-center gap-2 active:scale-95"
+                <button
+                  onClick={() => scrollToSection("student-locker")}
+                  className="px-6 py-3 bg-[#19202a] border border-[#3c4a42]/60 hover:bg-[#232a35] hover:border-[#4edea3]/60 transition-all duration-200 text-[#dce3f1] text-sm font-medium rounded-lg flex items-center gap-2 active:scale-95 cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[18px] text-[#4edea3]">lock</span>
                   <span>Student Locker</span>
-                </Link>
+                </button>
               </div>
 
               {/* Trust Badges */}
@@ -823,6 +845,70 @@ const Landing = () => {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ================= WHY BLOCKCHAIN SECTION ================= */}
+      <section className="py-20 border-b border-[#3c4a42]/20" id="why-blockchain">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center max-w-2xl mx-auto mb-16">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-[#19202a] border border-[#3c4a42]/40 mb-3 hover:border-[#4edea3]/40 transition-colors shadow-sm">
+              <span className="material-symbols-outlined text-[16px] text-[#4edea3]">hub</span>
+              <span className="text-xs font-semibold text-[#4edea3] tracking-wider uppercase">DECENTRALIZED ARCHITECTURE</span>
+            </div>
+            <h2 className="text-3xl font-semibold text-[#dce3f1] tracking-tight">
+              Why Blockchain Verification?
+            </h2>
+            <p className="text-sm text-[#bbcabf] mt-3">
+              Traditional paper diplomas and centralized database entries are vulnerable to forgery, backdating, and single-point-of-failure server outages.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Advantage 1 */}
+            <div className="interactive-card bg-[#151c26] p-6 rounded-xl border border-[#3c4a42]/30 space-y-4">
+              <div className="w-12 h-12 rounded-lg bg-[#10b981]/20 border border-[#4edea3]/40 flex items-center justify-center text-[#4edea3]">
+                <span className="material-symbols-outlined text-2xl">shield</span>
+              </div>
+              <h3 className="text-base font-semibold text-[#dce3f1]">Immutable Ledger</h3>
+              <p className="text-xs text-[#bbcabf] leading-relaxed">
+                Once a certificate hash is recorded in an Ethereum smart contract transaction, it cannot be edited, deleted, or backdated by anyone.
+              </p>
+            </div>
+
+            {/* Advantage 2 */}
+            <div className="interactive-card bg-[#151c26] p-6 rounded-xl border border-[#3c4a42]/30 space-y-4">
+              <div className="w-12 h-12 rounded-lg bg-[#10b981]/20 border border-[#4edea3]/40 flex items-center justify-center text-[#4edea3]">
+                <span className="material-symbols-outlined text-2xl">visibility_off</span>
+              </div>
+              <h3 className="text-base font-semibold text-[#dce3f1]">Zero-Knowledge Privacy</h3>
+              <p className="text-xs text-[#bbcabf] leading-relaxed">
+                Only standard SHA-256 binary digests are anchored on-chain. Private student records and grades stay 100% confidential.
+              </p>
+            </div>
+
+            {/* Advantage 3 */}
+            <div className="interactive-card bg-[#151c26] p-6 rounded-xl border border-[#3c4a42]/30 space-y-4">
+              <div className="w-12 h-12 rounded-lg bg-[#10b981]/20 border border-[#4edea3]/40 flex items-center justify-center text-[#4edea3]">
+                <span className="material-symbols-outlined text-2xl">bolt</span>
+              </div>
+              <h3 className="text-base font-semibold text-[#dce3f1]">Instant Verification</h3>
+              <p className="text-xs text-[#bbcabf] leading-relaxed">
+                Employers and third parties verify diploma authenticity in sub-seconds using runtime PDF byte matching—no manual background checks required.
+              </p>
+            </div>
+
+            {/* Advantage 4 */}
+            <div className="interactive-card bg-[#151c26] p-6 rounded-xl border border-[#3c4a42]/30 space-y-4">
+              <div className="w-12 h-12 rounded-lg bg-[#10b981]/20 border border-[#4edea3]/40 flex items-center justify-center text-[#4edea3]">
+                <span className="material-symbols-outlined text-2xl">history_edu</span>
+              </div>
+              <h3 className="text-base font-semibold text-[#dce3f1]">On-Chain Revocation</h3>
+              <p className="text-xs text-[#bbcabf] leading-relaxed">
+                Institutions retain cryptographic control to flag revoked credentials on-chain, complete with block height and official reason logs.
+              </p>
             </div>
           </div>
         </div>
