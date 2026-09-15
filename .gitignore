@@ -1,0 +1,21 @@
+# Node dependencies
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+
+# Build and Hardhat outputs
+artifacts/
+cache/
+frontend/dist/
+
+# Environment files
+.env
+.env.local
+backend/.env
+frontend/.env
+
+# OS / Editor junk
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
