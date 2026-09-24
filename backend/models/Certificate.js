@@ -68,7 +68,16 @@ const certificateSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },
-    // Stores the exact original PDF bytes so download returns the SAME file
+    fileCategory: {
+      type: String,
+      enum: ["document", "image"],
+      default: "document",
+    },
+    mimeType: {
+      type: String,
+      default: "application/pdf",
+    },
+    // Stores the exact original file bytes so download returns the SAME file
     // whose SHA-256 hash is registered on the blockchain (enables offline verification)
     originalPdf: {
       type: Buffer,
@@ -77,6 +86,10 @@ const certificateSchema = new mongoose.Schema(
     originalPdfName: {
       type: String,
       default: "certificate.pdf",
+    },
+    originalFileName: {
+      type: String,
+      default: "",
     },
   },
   {

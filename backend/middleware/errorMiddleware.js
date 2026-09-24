@@ -16,15 +16,25 @@ const errorHandler = (err, req, res, next) => {
 
   // Mongoose duplicate key error
   if (err.code === 11000) {
-    statusCode = 400;
-    const field = Object.keys(err.keyValue)[0];
-    message = `Duplicate field value entered for '${field}'. Please use another value.`;
+    statusCode = 409;
+    const field = err.keyValue ? Object.keys(err.keyValue)[0] : "field";
+    if (field === "documentHash") {
+      message = "Duplicate file detected. This document has already been registered using the same SHA-256 hash and cannot be issued again.";
+    } else {
+      message = `Duplicate field value entered for '${field}'. Please use another value.`;
+    }
   }
 
   // Mongoose validation error
   if (err.name === "ValidationError") {
     statusCode = 400;
     message = Object.values(err.errors).map((val) => val.message).join(", ");
+  }
+
+  // Multer file size error
+  if (err.code === "LIMIT_FILE_SIZE") {
+    statusCode = 400;
+    message = "File size must not exceed 10 MB.";
   }
 
   res.status(statusCode).json({

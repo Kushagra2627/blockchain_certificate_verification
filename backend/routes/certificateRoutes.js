@@ -5,14 +5,7 @@ const multer = require("multer");
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype === "application/pdf") {
-      cb(null, true);
-    } else {
-      cb(null, false);
-    }
-  },
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB limit
 });
 
 const {
@@ -26,11 +19,11 @@ const {
   getQRCode,
 } = require("../controllers/certificateController");
 const { protect, authorize } = require("../middleware/authMiddleware");
-const { validatePdfUpload, validateCertificateInput } = require("../middleware/validateMiddleware");
+const { validateFileUpload, validateCertificateInput } = require("../middleware/validateMiddleware");
 
 // Public routes
 router.get("/", getCertificates);
-router.post("/verify", upload.single("certificatePdf"), validatePdfUpload, verifyCertificate);
+router.post("/verify", upload.single("certificatePdf"), validateFileUpload, verifyCertificate);
 router.get("/:certificateId/pdf", downloadPDF);
 router.get("/:certificateId/qrcode", getQRCode);
 router.get("/:identifier", getCertificateById);
@@ -41,7 +34,7 @@ router.post(
   protect,
   authorize("Admin"),
   upload.single("certificatePdf"),
-  validatePdfUpload,
+  validateFileUpload,
   validateCertificateInput,
   issueCertificate
 );

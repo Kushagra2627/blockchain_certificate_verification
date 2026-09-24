@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { certificateService } from "../services/certificateService";
+import { validateSelectedFile } from "../utils/fileValidator";
 import toast from "react-hot-toast";
 
 const Landing = () => {
@@ -13,6 +14,7 @@ const Landing = () => {
   const [verificationResult, setVerificationResult] = useState(null);
   const [activeTab, setActiveTab] = useState("authentic"); // 'authentic' | 'invalid' | 'revoked'
   const [copiedTx, setCopiedTx] = useState(false);
+  const [category, setCategory] = useState("document"); // "document" or "image"
 
   // Smooth scroll to section if state contains scrollTo target
   useEffect(() => {
@@ -31,12 +33,14 @@ const Landing = () => {
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      if (file.type === "application/pdf") {
-        setSelectedFile(file);
-        setVerificationResult(null);
-      } else {
-        toast.error("Please select a valid PDF file");
+      const validation = validateSelectedFile(file, category);
+      if (!validation.valid) {
+        toast.error(validation.error);
+        setSelectedFile(null);
+        return;
       }
+      setSelectedFile(file);
+      setVerificationResult(null);
     }
   };
 
@@ -45,12 +49,14 @@ const Landing = () => {
     setIsDragOver(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
-      if (file.type === "application/pdf") {
-        setSelectedFile(file);
-        setVerificationResult(null);
-      } else {
-        toast.error("Please drop a valid PDF file");
+      const validation = validateSelectedFile(file, category);
+      if (!validation.valid) {
+        toast.error(validation.error);
+        setSelectedFile(null);
+        return;
       }
+      setSelectedFile(file);
+      setVerificationResult(null);
     }
   };
 
@@ -69,28 +75,34 @@ const Landing = () => {
     setVerificationResult(null);
   };
 
-  // Real backend PDF verification trigger
+  // Real backend verification trigger
   const executeVerification = async () => {
     if (!selectedFile) {
-      toast.error("Please select or drop a PDF certificate first!");
+      toast.error(`Please select or drop a ${category} file first!`);
+      return;
+    }
+
+    const validation = validateSelectedFile(selectedFile, category);
+    if (!validation.valid) {
+      toast.error(validation.error);
       return;
     }
 
     try {
       setLoading(true);
       setVerificationResult(null);
-      const res = await certificateService.verifyCertificate(selectedFile);
+      const res = await certificateService.verifyCertificate(selectedFile, category);
       setVerificationResult(res);
 
       if (res.status === "AUTHENTIC") {
         setActiveTab("authentic");
-        toast.success("✓ Certificate Authentic & Verified!");
+        toast.success("✓ Document Authentic & Verified!");
       } else if (res.status === "REVOKED") {
         setActiveTab("revoked");
-        toast.error("⚠ Certificate Has Been Revoked!");
+        toast.error("⚠ Document Has Been Revoked!");
       } else {
         setActiveTab("invalid");
-        toast.error("✗ Invalid / Tampered Certificate!");
+        toast.error("✗ Invalid / Tampered Document!");
       }
     } catch (error) {
       console.error("Verification error:", error);
@@ -413,8 +425,8 @@ const Landing = () => {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             {/* Left: PDF Drag-and-Drop Area (6 cols) */}
             <div className="lg:col-span-6 bg-[#151c26] p-8 rounded-xl border border-[#3c4a42]/40 shadow-sm transition-all hover:border-[#3c4a42]/70">
-              <div className="text-left mb-6">
-                <div className="flex items-center justify-between">
+              <div className="text-left mb-4">
+                <div className="flex items-center justify-between mb-3">
                   <h3 className="text-lg font-semibold text-[#dce3f1]">Document Ingestion</h3>
                   <span className="px-2.5 py-0.5 rounded bg-[#19202a] border border-[#3c4a42]/40 font-mono text-xs text-[#4edea3] flex items-center gap-1.5 shadow-sm">
                     <span className="relative flex h-2 w-2">
@@ -424,7 +436,37 @@ const Landing = () => {
                     Client-Side Engine
                   </span>
                 </div>
-                <p className="text-xs text-[#bbcabf] mt-1">Upload the official conferred PDF certificate file directly from your device.</p>
+
+                {/* Category Selection */}
+                <div className="grid grid-cols-2 gap-3 mb-2">
+                  <button
+                    type="button"
+                    onClick={() => { setCategory("document"); setSelectedFile(null); setVerificationResult(null); }}
+                    className={`py-2 px-3 rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-1.5 border cursor-pointer ${
+                      category === "document"
+                        ? "bg-[#10b981]/20 border-[#10b981] text-[#4edea3]"
+                        : "bg-[#0d141e] border-[#3c4a42]/60 text-[#bbcabf] hover:border-[#4edea3]/40"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[16px]">description</span>
+                    Document
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setCategory("image"); setSelectedFile(null); setVerificationResult(null); }}
+                    className={`py-2 px-3 rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-1.5 border cursor-pointer ${
+                      category === "image"
+                        ? "bg-[#10b981]/20 border-[#10b981] text-[#4edea3]"
+                        : "bg-[#0d141e] border-[#3c4a42]/60 text-[#bbcabf] hover:border-[#4edea3]/40"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[16px]">image</span>
+                    Image
+                  </button>
+                </div>
+                <p className="text-xs text-[#bbcabf] mt-1">
+                  Upload original {category === "image" ? "image (JPG, PNG, WEBP, GIF, BMP)" : "document (PDF, DOC, DOCX, TXT)"} file up to 10 MB.
+                </p>
               </div>
 
               {/* Dropzone */}
@@ -432,7 +474,7 @@ const Landing = () => {
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
-                onClick={() => document.getElementById("landingPdfInput").click()}
+                onClick={() => document.getElementById("landingFileInput").click()}
                 className={`border-2 border-dashed rounded-xl p-6 text-center bg-[#0d141e]/50 cursor-pointer dropzone-pulse ${
                   isDragOver
                     ? "border-[#4edea3] bg-[#10b981]/10"
@@ -442,11 +484,13 @@ const Landing = () => {
                 }`}
               >
                 <div className="w-14 h-14 mx-auto rounded-full bg-[#232a35] border border-[#3c4a42]/50 flex items-center justify-center text-[#4edea3] dropzone-icon transition-transform duration-200 shadow-sm">
-                  <span className="material-symbols-outlined text-2xl">picture_as_pdf</span>
+                  <span className="material-symbols-outlined text-2xl">
+                    {category === "image" ? "image" : "description"}
+                  </span>
                 </div>
                 <div className="mt-3">
                   <p className="text-sm font-medium text-[#dce3f1] hover:text-[#4edea3] transition-colors">
-                    {selectedFile ? selectedFile.name : "Drag & drop your certificate here or click to browse"}
+                    {selectedFile ? selectedFile.name : `Drag & drop your ${category} file here or click to browse`}
                   </p>
                   <p className="text-xs text-[#bbcabf] mt-1">
                     Local SHA-256 checksum is computed instantly in browser memory
@@ -454,12 +498,16 @@ const Landing = () => {
                 </div>
                 <div className="mt-3 inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#19202a] border border-[#3c4a42]/50 text-[#bbcabf] font-mono text-xs">
                   <span className="w-2 h-2 rounded-full bg-[#4edea3] animate-pulse"></span>
-                  <span>PDF • Maximum 10 MB</span>
+                  <span>{category.toUpperCase()} • Maximum 10 MB</span>
                 </div>
                 <input
-                  id="landingPdfInput"
+                  id="landingFileInput"
                   type="file"
-                  accept="application/pdf"
+                  accept={
+                    category === "image"
+                      ? ".jpg,.jpeg,.png,.webp,.gif,.bmp,.tif,.tiff,.svg,image/*"
+                      : ".pdf,.doc,.docx,.txt,.rtf,.odt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                  }
                   onChange={handleFileChange}
                   className="hidden"
                 />

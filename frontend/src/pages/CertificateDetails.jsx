@@ -147,6 +147,14 @@ const CertificateDetails = () => {
               <p className="text-[#dce3f1] font-mono mt-0.5">{certificate.grade || "Pass"}</p>
             </div>
             <div>
+              <span className="text-[#bbcabf] font-medium">File Category</span>
+              <p className="text-[#dce3f1] font-mono mt-0.5 uppercase">{certificate.fileCategory || "document"}</p>
+            </div>
+            <div>
+              <span className="text-[#bbcabf] font-medium">Original File Name</span>
+              <p className="text-[#dce3f1] font-mono mt-0.5 truncate">{certificate.originalFileName || certificate.originalPdfName || "N/A"}</p>
+            </div>
+            <div>
               <span className="text-[#bbcabf] font-medium">Blockchain Status</span>
               <p className={`font-mono font-semibold mt-0.5 ${isRevoked ? "text-red-400" : "text-[#4edea3]"}`}>
                 {certificate.blockchainStatus || "Confirmed"}
@@ -236,7 +244,7 @@ const CertificateDetails = () => {
               className="flex-1 py-3 rounded-lg bg-[#10b981] hover:bg-[#45dfa4] text-[#00422b] font-semibold text-sm flex items-center justify-center gap-2 shadow-lg transition-all btn-shine"
             >
               <span className="material-symbols-outlined text-[20px]">download</span>
-              Download PDF Certificate
+              Download Registered File
             </button>
 
             {/* Copy shareable link */}

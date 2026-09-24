@@ -21,12 +21,38 @@ const issueCertificate = async (req, res, next) => {
       });
     }
 
-    // Compute SHA-256 hash from exact PDF file buffer
+    // 1. Compute SHA-256 hash from exact uploaded file buffer
     const documentHash = crypto
       .createHash("sha256")
       .update(req.file.buffer)
       .digest("hex")
       .toLowerCase();
+
+    // 2. DUPLICATE CHECK: Check MongoDB database (includes active & revoked records)
+    const existingDBCert = await Certificate.findOne({ documentHash });
+    if (existingDBCert) {
+      return res.status(409).json({
+        success: false,
+        message: "Duplicate file detected. This document has already been registered using the same SHA-256 hash and cannot be issued again.",
+        code: "DUPLICATE_FILE",
+        existingDocumentHash: documentHash,
+      });
+    }
+
+    // 3. DUPLICATE CHECK: Check Blockchain Smart Contract (before sending transaction)
+    try {
+      const chainRecord = await BlockchainService.getCertificateByDocHash(documentHash);
+      if (chainRecord && chainRecord.existsOnChain) {
+        return res.status(409).json({
+          success: false,
+          message: "Duplicate file detected. This document has already been registered using the same SHA-256 hash and cannot be issued again.",
+          code: "DUPLICATE_FILE",
+          existingDocumentHash: documentHash,
+        });
+      }
+    } catch (bcCheckErr) {
+      console.warn("[Issue Duplicate Check] Blockchain lookup warning:", bcCheckErr.message);
+    }
 
     // Auto-generate a unique certificateId if not provided by the admin
     const generateCertId = () => {
@@ -37,15 +63,6 @@ const issueCertificate = async (req, res, next) => {
     const formattedCertId = certificateId
       ? certificateId.trim().toUpperCase()
       : generateCertId();
-
-    // Check MongoDB duplicate hash
-    const existingCert = await Certificate.findOne({ documentHash });
-    if (existingCert) {
-      return res.status(400).json({
-        success: false,
-        message: `This exact PDF document hash ('${documentHash}') has already been issued.`,
-      });
-    }
 
     // Write to Blockchain Smart Contract via Ethers.js
     let txReceipt = { transactionHash: "0x_mock_tx_hash_" + Date.now(), issuerWallet: walletAddress || "0x00" };
@@ -67,7 +84,11 @@ const issueCertificate = async (req, res, next) => {
       blockchainStatus = "Pending";
     }
 
-    // Save in MongoDB — store original PDF bytes so download returns the EXACT same file
+    const fileCategory = (req.body.fileCategory || req.body.category || "document").toLowerCase();
+    const mimeType = req.file.mimetype || "application/pdf";
+    const originalFileName = req.file.originalname || `${formattedCertId}.pdf`;
+
+    // Save in MongoDB — store original file bytes so download returns the EXACT same file
     // (same SHA-256 hash as registered on-chain, enabling company verification)
     const newCertificate = await Certificate.create({
       documentHash,
@@ -82,13 +103,16 @@ const issueCertificate = async (req, res, next) => {
       transactionHash: txReceipt.transactionHash,
       blockchainStatus,
       issuedBy: req.user ? req.user._id : undefined,
+      fileCategory,
+      mimeType,
       originalPdf: req.file.buffer,
-      originalPdfName: req.file.originalname || `${formattedCertId}.pdf`,
+      originalPdfName: originalFileName,
+      originalFileName,
     });
 
     return res.status(201).json({
       success: true,
-      message: "Certificate issued and PDF document hash anchored on Ethereum blockchain successfully!",
+      message: "Document/certificate issued and hash anchored on Ethereum blockchain successfully!",
       data: newCertificate,
       documentHash,
       transactionHash: txReceipt.transactionHash,
@@ -256,6 +280,9 @@ const verifyCertificate = async (req, res, next) => {
           issueDate: dbCert?.issueDate || chainRecord.issueDate,
           grade: dbCert?.grade || "Pass",
           certificateId: dbCert?.certificateId || chainRecord.certificateId || null,
+          fileCategory: dbCert?.fileCategory || "document",
+          mimeType: dbCert?.mimeType || "application/pdf",
+          fileName: dbCert?.originalFileName || dbCert?.originalPdfName || null,
         },
         blockchainProof: {
           issuerWallet: chainRecord.issuerWallet,
@@ -278,8 +305,8 @@ const verifyCertificate = async (req, res, next) => {
         reason: "HASH_NOT_FOUND",
         verificationSource: blockchainOnline ? "BLOCKCHAIN" : "DATABASE",
         message: blockchainOnline
-          ? "The uploaded PDF hash is not registered on the Ethereum blockchain."
-          : "The uploaded PDF hash was not found in the certificate database.",
+          ? "The uploaded file hash is not registered on the Ethereum blockchain."
+          : "The uploaded file hash was not found in the database.",
         uploadedDocumentHash: uploadedHash,
       });
     }
@@ -291,7 +318,7 @@ const verifyCertificate = async (req, res, next) => {
         verified: false,
         status: "REVOKED",
         verificationSource: "DATABASE",
-        message: "This certificate exists in the database but has been marked as REVOKED.",
+        message: "This file exists in the database but has been marked as REVOKED.",
         uploadedDocumentHash: uploadedHash,
       });
     }
@@ -303,8 +330,8 @@ const verifyCertificate = async (req, res, next) => {
       status: "AUTHENTIC",
       verificationSource: blockchainOnline ? "DATABASE_PENDING" : "DATABASE",
       message: blockchainOnline
-        ? "Certificate found in the institutional database. Blockchain anchoring is pending confirmation."
-        : "Certificate found and verified in the institutional database. (Blockchain node offline — database verification used.)",
+        ? "Document found in the institutional database. Blockchain anchoring is pending confirmation."
+        : "Document found and verified in the institutional database. (Blockchain node offline — database verification used.)",
       uploadedDocumentHash: uploadedHash,
       certificate: {
         studentName: dbCert.studentName,
@@ -313,6 +340,9 @@ const verifyCertificate = async (req, res, next) => {
         issueDate: dbCert.issueDate,
         grade: dbCert.grade || "Pass",
         certificateId: dbCert.certificateId || null,
+        fileCategory: dbCert.fileCategory || "document",
+        mimeType: dbCert.mimeType || "application/pdf",
+        fileName: dbCert.originalFileName || dbCert.originalPdfName || null,
       },
       blockchainProof: {
         transactionHash: dbCert.transactionHash || null,
@@ -393,20 +423,21 @@ const downloadPDF = async (req, res, next) => {
     // Accept MongoDB _id (24-char hex) or human-readable certificateId
     // MUST use .select("+originalPdf") because originalPdf has select:false by default
     if (/^[0-9a-fA-F]{24}$/.test(param)) {
-      certificate = await Certificate.findById(param).select("+originalPdf +originalPdfName");
+      certificate = await Certificate.findById(param).select("+originalPdf +originalPdfName +originalFileName +mimeType");
     } else {
-      certificate = await Certificate.findOne({ certificateId: param.toUpperCase() }).select("+originalPdf +originalPdfName");
+      certificate = await Certificate.findOne({ certificateId: param.toUpperCase() }).select("+originalPdf +originalPdfName +originalFileName +mimeType");
     }
 
     if (!certificate) {
       return res.status(404).json({ success: false, message: `Certificate '${param}' not found.` });
     }
 
-    const downloadFilename = certificate.originalPdfName || `Certificate-${certificate.certificateId || param}.pdf`;
+    const contentType = certificate.mimeType || "application/pdf";
+    const downloadFilename = certificate.originalFileName || certificate.originalPdfName || `Certificate-${certificate.certificateId || param}.pdf`;
 
-    // ✅ PRIMARY PATH: Serve the EXACT original PDF bytes (same hash as on blockchain)
+    // ✅ PRIMARY PATH: Serve the EXACT original file bytes (same hash as on blockchain)
     if (certificate.originalPdf && certificate.originalPdf.length > 0) {
-      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Type", contentType);
       res.setHeader("Content-Disposition", `attachment; filename="${downloadFilename}"`);
       res.setHeader("Content-Length", certificate.originalPdf.length);
       return res.end(certificate.originalPdf);

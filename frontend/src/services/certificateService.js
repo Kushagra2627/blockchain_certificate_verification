@@ -6,9 +6,11 @@ export const certificateService = {
    * Backend: POST /api/certificates/verify
    * Returns: { success, verified, status, certificate, blockchainProof, uploadedDocumentHash }
    */
-  async verifyCertificate(file) {
+  async verifyCertificate(file, category = "document") {
     const formData = new FormData();
     formData.append("certificatePdf", file);
+    formData.append("category", category);
+    formData.append("fileCategory", category);
     // Do NOT set Content-Type header manually — axios sets multipart/form-data with boundary automatically
     const response = await api.post("/certificates/verify", formData);
     return response.data;
