@@ -1,7 +1,9 @@
 import axios from "axios";
 
+// In production (Vercel), the frontend and backend share the same domain,
+// so /api proxy works. VITE_API_URL can override this for split deployments.
 const api = axios.create({
-  baseURL: "/api",
+  baseURL: import.meta.env.VITE_API_URL || "/api",
 });
 
 api.interceptors.request.use(
