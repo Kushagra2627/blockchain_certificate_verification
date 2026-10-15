@@ -4,6 +4,14 @@ A production-ready full-stack application that enables educational institutions 
 
 Public verifiers can upload any certificate PDF file to verify its authenticity directly against the Ethereum blockchain in real-time — **without requiring any Certificate ID or user login**.
 
+
+## 🌐 Live Deployments
+
+- **Frontend (Vercel)**: [https://blockchaincertificateverification.vercel.app](https://blockchaincertificateverification.vercel.app)
+- **Backend API (Render)**: [https://blockchain-certificate-verification-oq97.onrender.com](https://blockchain-certificate-verification-oq97.onrender.com)
+- **API Health Check**: [https://blockchain-certificate-verification-oq97.onrender.com/health](https://blockchain-certificate-verification-oq97.onrender.com/health)
+- **Smart Contract (Sepolia Testnet)**: [`0x32D809EE16D20f00Bb2996A89586fc7879823054`](https://sepolia.etherscan.io/address/0x32D809EE16D20f00Bb2996A89586fc7879823054)
+
 ---
 
 ## 🚀 Architecture & Core Principles
