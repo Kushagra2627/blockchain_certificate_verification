@@ -7,7 +7,7 @@ Public verifiers can upload any certificate PDF file to verify its authenticity 
 
 ## 🌐 Live Deployments
 
-- **Frontend (Vercel)**: [https://blockchaincertificateverification.vercel.app](https://blockchaincertificateverification.vercel.app)
+- **Frontend (Vercel)**: [https://blockchain-certificate-verification-five.vercel.app](https://blockchain-certificate-verification-five.vercel.app)
 - **Backend API (Render)**: [https://blockchain-certificate-verification-oq97.onrender.com](https://blockchain-certificate-verification-oq97.onrender.com)
 - **API Health Check**: [https://blockchain-certificate-verification-oq97.onrender.com/health](https://blockchain-certificate-verification-oq97.onrender.com/health)
 - **Smart Contract (Sepolia Testnet)**: [`0x32D809EE16D20f00Bb2996A89586fc7879823054`](https://sepolia.etherscan.io/address/0x32D809EE16D20f00Bb2996A89586fc7879823054)
