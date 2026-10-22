@@ -35,11 +35,16 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // Health Check API
 app.get("/health", (req, res) => {
+  const mongoose = require("mongoose");
+  const dbStates = ["Disconnected", "Connected", "Connecting", "Disconnecting"];
+  const dbStatus = dbStates[mongoose.connection.readyState] || "Unknown";
+
   res.json({
     status: "OK",
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
     service: "Blockchain Certificate Verification API",
+    database: dbStatus,
   });
 });
 
