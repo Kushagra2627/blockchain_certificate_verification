@@ -4,6 +4,7 @@
   "description": "Smart Contract and Hardhat workspace for Blockchain Based Certificate Verification System",
   "main": "hardhat.config.js",
   "scripts": {
+    "build": "npm --prefix frontend install && npm --prefix frontend run build",
     "compile": "hardhat compile",
     "test": "hardhat test",
     "node": "hardhat node",
