@@ -6,6 +6,8 @@ const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 
 const authRoutes = require("./routes/authRoutes");
 const certificateRoutes = require("./routes/certificateRoutes");
+const mongoose = require("mongoose");
+const connectDB = require("./config/db");
 
 const app = express();
 
@@ -32,6 +34,19 @@ app.use("/api/", limiter);
 // Body Parser Middleware
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// Dynamic DB reconnection middleware: if Atlas was sleeping/paused on boot, reconnect on-demand
+app.use(async (req, res, next) => {
+  if (mongoose.connection.readyState === 0) {
+    try {
+      console.log("[DB Middleware]: Reconnecting to MongoDB Atlas on incoming request...");
+      await connectDB();
+    } catch (err) {
+      console.error("[DB Middleware Error]:", err.message);
+    }
+  }
+  next();
+});
 
 // Health Check API
 app.get("/health", (req, res) => {
