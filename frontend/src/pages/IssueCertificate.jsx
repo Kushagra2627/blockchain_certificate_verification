@@ -217,7 +217,7 @@ const IssueCertificate = () => {
                   {attachedFile ? attachedFile.name : `Click to select or drop original ${category}`}
                 </p>
                 <p className="text-[11px] text-[#bbcabf] font-mono">
-                  Maximum size: 10 MB • SHA-256 hash will be anchored to Ethereum contract
+                  Maximum size: 10 MB • PDF documents will have a verification QR code embedded prior to SHA-256 anchoring
                 </p>
               </label>
             </div>

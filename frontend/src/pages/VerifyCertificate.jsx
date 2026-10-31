@@ -1,16 +1,44 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { useParams, Link } from "react-router-dom";
 import { certificateService } from "../services/certificateService";
 import { validateSelectedFile } from "../utils/fileValidator";
 import toast from "react-hot-toast";
 
 export default function VerifyCertificate() {
+  const { documentId } = useParams(); // Captured when scanned via QR code (/verify/:documentId)
   const [category, setCategory] = useState("document"); // "document" or "image"
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [calculatedHash, setCalculatedHash] = useState(null);
   const [dragging, setDragging] = useState(false);
+  const [refDetails, setRefDetails] = useState(null);
+  const [refLoading, setRefLoading] = useState(false);
   const inputRef = useRef(null);
+
+  // If redirected via QR code (/verify/:documentId), load document public reference
+  useEffect(() => {
+    if (documentId) {
+      loadDocumentReference(documentId);
+    }
+  }, [documentId]);
+
+  const loadDocumentReference = async (id) => {
+    try {
+      setRefLoading(true);
+      const res = await certificateService.getCertificateById(id);
+      if (res.success && res.data) {
+        setRefDetails(res.data);
+        if (res.data.fileCategory) {
+          setCategory(res.data.fileCategory);
+        }
+      }
+    } catch (err) {
+      console.warn("Could not pre-fetch reference metadata:", err?.response?.data?.message || err.message);
+    } finally {
+      setRefLoading(false);
+    }
+  };
 
   const processFile = async (selected) => {
     if (!selected) return;
@@ -27,7 +55,7 @@ export default function VerifyCertificate() {
     setFile(selected);
     setResult(null);
 
-    // Compute SHA-256 client-side for preview
+    // Compute SHA-256 client-side for instant preview
     try {
       const arrayBuffer = await selected.arrayBuffer();
       const hashBuffer = await crypto.subtle.digest("SHA-256", arrayBuffer);
@@ -66,8 +94,8 @@ export default function VerifyCertificate() {
     setResult(null);
 
     try {
-      // Backend: POST /api/certificates/verify
-      const res = await certificateService.verifyCertificate(file, category);
+      // Backend: POST /api/certificates/verify (passes documentId if scanned from QR)
+      const res = await certificateService.verifyCertificate(file, category, documentId || "");
       setResult(res);
 
       if (res.verified && res.status === "AUTHENTIC") {
@@ -78,6 +106,10 @@ export default function VerifyCertificate() {
         );
       } else if (res.status === "REVOKED") {
         toast.error("⚠ Document was REVOKED on-chain!");
+      } else if (res.status === "INVALID / TAMPERED") {
+        toast.error("✗ Document Tampered — Hash does not match QR reference!");
+      } else if (res.status === "UNAVAILABLE") {
+        toast.error("⚠ Blockchain network temporarily unavailable.");
       } else {
         toast.error("✗ Document Invalid — Hash not found on blockchain");
       }
@@ -102,22 +134,56 @@ export default function VerifyCertificate() {
         <div className="text-center mb-10">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-[#151c26] border border-[#3c4a42]/40 mb-4">
             <span className="material-symbols-outlined text-[16px] text-[#4edea3]">verified_user</span>
-            <span className="font-mono text-xs text-[#4edea3] tracking-widest">STANDALONE VERIFICATION CONSOLE</span>
+            <span className="font-mono text-xs text-[#4edea3] tracking-widest">
+              {documentId ? "QR-LINKED CRYPTOGRAPHIC VERIFICATION" : "STANDALONE VERIFICATION CONSOLE"}
+            </span>
           </div>
           <h1 className="text-4xl font-bold tracking-tight text-white mb-3">
-            Cryptographic Document Check
+            {documentId ? "Verify Scanned Document" : "Cryptographic Document Check"}
           </h1>
           <p className="text-[#bbcabf] max-w-xl mx-auto text-sm leading-relaxed">
-            Upload the exact original document or image. We compute its SHA-256 byte digest and query it against the Ethereum smart contract — no ID or text input required.
+            {documentId
+              ? `You scanned the verification QR code for document reference "${documentId}". Upload the document file to cryptographically verify its SHA-256 signature against the Ethereum blockchain.`
+              : "Upload the exact original document or image. We compute its SHA-256 byte digest and query it directly against the Ethereum smart contract."}
           </p>
         </div>
+
+        {/* QR Context Banner if documentId is present */}
+        {documentId && (
+          <div className="mb-8 p-4 rounded-xl bg-[#151c26] border border-[#4edea3]/40 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="material-symbols-outlined text-3xl text-[#4edea3]">qr_code_scanner</span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-[#bbcabf] font-medium">Scanned Document Reference:</span>
+                  <span className="font-mono text-xs font-bold text-[#4edea3] bg-[#0d141e] px-2 py-0.5 rounded border border-[#3c4a42]/60">
+                    {documentId}
+                  </span>
+                </div>
+                {refDetails ? (
+                  <p className="text-sm font-semibold text-white mt-1">
+                    {refDetails.course} — <span className="text-[#bbcabf] font-normal">{refDetails.institution}</span>
+                  </p>
+                ) : refLoading ? (
+                  <p className="text-xs text-[#bbcabf] mt-1">Looking up document reference...</p>
+                ) : null}
+              </div>
+            </div>
+            <Link
+              to="/verify"
+              className="text-xs text-[#bbcabf] hover:text-[#4edea3] underline flex items-center gap-1 font-mono self-end sm:self-auto"
+            >
+              <span>Clear Reference</span>
+            </Link>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
           {/* Upload Card */}
           <div className="bg-[#151c26] p-6 rounded-xl border border-[#3c4a42]/40 shadow-xl">
             <h2 className="text-base font-bold text-white mb-4 flex items-center gap-2">
               <span className="material-symbols-outlined text-[#4edea3]">upload_file</span>
-              Upload & Verify File
+              {documentId ? "Upload Document for Verification" : "Upload & Verify File"}
             </h2>
 
             {/* Category Selector */}
@@ -187,8 +253,8 @@ export default function VerifyCertificate() {
                   {file
                     ? `${(file.size / 1024 / 1024).toFixed(2)} MB — Ready to verify`
                     : category === "image"
-                    ? "JPG, PNG, WEBP, GIF, BMP, TIFF, SVG up to 10 MB"
-                    : "PDF, DOC, DOCX, TXT, RTF, ODT up to 10 MB"}
+                    ? "JPG, PNG, WEBP, GIF, BMP up to 10 MB"
+                    : "PDF, DOC, DOCX, TXT up to 10 MB"}
                 </p>
                 <input
                   ref={inputRef}
@@ -203,7 +269,7 @@ export default function VerifyCertificate() {
               {calculatedHash && (
                 <div className="p-3 bg-[#0d141e] rounded-lg border border-[#3c4a42]/40 text-xs font-mono">
                   <span className="text-[#bbcabf] font-sans block mb-1">
-                    Calculated SHA-256 Digest (client-side preview):
+                    Calculated SHA-256 Digest (exact file bytes):
                   </span>
                   <span className="text-[#4edea3] break-all">{calculatedHash}</span>
                 </div>
@@ -222,7 +288,7 @@ export default function VerifyCertificate() {
                 ) : (
                   <>
                     <span className="material-symbols-outlined">fact_check</span>
-                    Verify File Bytes on Blockchain
+                    Verify Document Authenticity
                   </>
                 )}
               </button>
@@ -241,7 +307,9 @@ export default function VerifyCertificate() {
               <div className="py-10 text-center text-[#bbcabf]/50">
                 <span className="material-symbols-outlined text-5xl block mb-3">plagiarism</span>
                 <p className="text-sm">
-                  Upload a document or image and click verify to query the Ethereum smart contract ledger.
+                  {documentId
+                    ? `Upload the document corresponding to reference "${documentId}" to run cryptographic proof check.`
+                    : "Upload a document or image and click verify to query the Ethereum smart contract ledger."}
                 </p>
               </div>
             )}
@@ -250,8 +318,8 @@ export default function VerifyCertificate() {
             {loading && (
               <div className="py-10 text-center text-[#4edea3]">
                 <div className="w-10 h-10 border-2 border-[#4edea3] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                <p className="text-sm font-medium">Computing SHA-256 & Searching Blockchain...</p>
-                <p className="text-xs text-[#bbcabf] mt-1">This may take a few seconds</p>
+                <p className="text-sm font-medium">Computing SHA-256 & Querying Ethereum Sepolia...</p>
+                <p className="text-xs text-[#bbcabf] mt-1">Verifying cryptographic hash on smart contract</p>
               </div>
             )}
 
@@ -260,7 +328,7 @@ export default function VerifyCertificate() {
               <div className="space-y-4">
                 <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#10b981]/15 text-[#4edea3] border border-[#4edea3]/40 text-xs font-bold">
                   <span className="w-2 h-2 rounded-full bg-[#4edea3] animate-pulse"></span>
-                  ✓ {result.verificationSource === "BLOCKCHAIN" ? "Authentic & Verified on Ethereum" : "Authentic & Verified (Database)"}
+                  ✓ AUTHENTIC & VERIFIED ON ETHEREUM
                 </div>
                 {result.message && (
                   <p className="text-xs text-[#bbcabf] italic">{result.message}</p>
@@ -269,11 +337,12 @@ export default function VerifyCertificate() {
                 <div className="space-y-2 text-xs">
                   {[
                     ["Recipient / Subject", result.certificate?.studentName],
-                    ["Document / Course", result.certificate?.course],
+                    ["Document / Degree", result.certificate?.course],
                     ["Issuing Institution", result.certificate?.institution],
                     ["Issue Date", result.certificate?.issueDate ? new Date(result.certificate.issueDate).toLocaleDateString("en-IN") : "N/A"],
+                    ["Classification", result.certificate?.grade || "Pass"],
+                    ["Reference ID", result.certificate?.certificateId || documentId || "N/A"],
                     ["Category", (result.certificate?.fileCategory || category).toUpperCase()],
-                    ["File Name", result.certificate?.fileName || file?.name || "N/A"],
                   ].map(([label, value]) => (
                     <div key={label} className="flex justify-between border-b border-[#3c4a42]/20 pb-1.5">
                       <span className="text-[#bbcabf]">{label}:</span>
@@ -282,47 +351,101 @@ export default function VerifyCertificate() {
                   ))}
                 </div>
 
-                {result.blockchainProof?.transactionHash && (
-                  <div className="p-2 bg-[#0d141e] rounded border border-[#3c4a42]/40 text-xs font-mono">
-                    <span className="text-[#bbcabf] block mb-0.5">Ethereum Tx Hash:</span>
-                    <span className="text-[#4edea3] break-all">{result.blockchainProof.transactionHash}</span>
+                {result.blockchainProof?.issuerWallet && (
+                  <div className="p-2.5 bg-[#0d141e] rounded border border-[#3c4a42]/40 text-xs font-mono space-y-1">
+                    <div className="flex justify-between text-[#bbcabf]">
+                      <span>Issuer Wallet:</span>
+                      <span className="text-[#dce3f1] truncate max-w-[180px]">{result.blockchainProof.issuerWallet}</span>
+                    </div>
+                    {result.blockchainProof.transactionHash && (
+                      <div className="flex justify-between text-[#bbcabf]">
+                        <span>Tx Hash:</span>
+                        <span className="text-[#4edea3] truncate max-w-[180px]">{result.blockchainProof.transactionHash}</span>
+                      </div>
+                    )}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* INVALID / TAMPERED result */}
+            {result && !loading && result.status === "INVALID / TAMPERED" && (
+              <div className="space-y-4">
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/15 text-red-400 border border-red-500/40 text-xs font-bold">
+                  <span className="material-symbols-outlined text-[16px]">gpp_bad</span>
+                  ✗ INVALID / TAMPERED DOCUMENT
+                </div>
+                <p className="text-xs text-[#ffb4ab] leading-relaxed">
+                  {result.message || "The uploaded file bytes do not match the expected cryptographic hash registered for this reference."}
+                </p>
+                <div className="p-3 bg-[#0d141e] rounded-lg border border-red-500/30 text-xs font-mono space-y-2">
+                  <div>
+                    <span className="text-[#bbcabf] block mb-0.5">Uploaded File Hash:</span>
+                    <span className="text-red-400 break-all">{result.uploadedDocumentHash}</span>
+                  </div>
+                  {result.expectedDocumentHash && (
+                    <div>
+                      <span className="text-[#bbcabf] block mb-0.5">Expected On-Chain Hash:</span>
+                      <span className="text-[#4edea3] break-all">{result.expectedDocumentHash}</span>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
             {/* REVOKED result */}
             {result && !loading && result.status === "REVOKED" && (
-              <div className="space-y-3">
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-yellow-500/10 text-yellow-400 border border-yellow-500/30 text-xs font-bold">
-                  <span className="material-symbols-outlined text-[16px]">cancel</span>
-                  Revoked On-Chain by Authority
+              <div className="space-y-4">
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/15 text-red-400 border border-red-500/40 text-xs font-bold">
+                  <span className="material-symbols-outlined text-[16px]">block</span>
+                  ⚠ DOCUMENT OFFICIALLY REVOKED
                 </div>
-                <p className="text-xs text-[#bbcabf] leading-relaxed">
-                  This document hash exists in the contract registry but was marked REVOKED by the issuing authority administrator.
+                <p className="text-xs text-[#ffb4ab] leading-relaxed">
+                  This document hash exists in the Ethereum smart contract registry, but its status has been officially REVOKED by the issuing institution.
                 </p>
-                <div className="p-2 bg-[#0d141e] rounded border border-yellow-500/20 text-xs font-mono text-[#bbcabf]">
-                  Hash: <span className="text-yellow-400 break-all">{result.uploadedDocumentHash}</span>
+                <div className="p-2.5 bg-[#0d141e] rounded border border-red-500/20 text-xs font-mono">
+                  <span className="text-[#bbcabf] block mb-0.5">Revoked On-Chain Hash:</span>
+                  <span className="text-red-400 break-all">{result.uploadedDocumentHash}</span>
                 </div>
+                {result.certificate && (
+                  <div className="space-y-1.5 text-xs text-[#bbcabf] border-t border-[#3c4a42]/30 pt-2">
+                    <p><span className="text-white font-semibold">Recipient:</span> {result.certificate.studentName}</p>
+                    <p><span className="text-white font-semibold">Document:</span> {result.certificate.course}</p>
+                    <p><span className="text-white font-semibold">Institution:</span> {result.certificate.institution}</p>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* INVALID / NOT FOUND result */}
-            {result && !loading && (result.status === "INVALID" || result.status === "ERROR") && (
+            {/* NOT FOUND result */}
+            {result && !loading && result.status === "NOT FOUND" && (
               <div className="space-y-3">
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/30 text-xs font-bold">
-                  <span className="material-symbols-outlined text-[16px]">gpp_bad</span>
-                  Hash Unregistered / Not Found
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/15 text-amber-400 border border-amber-500/30 text-xs font-bold">
+                  <span className="material-symbols-outlined text-[16px]">search_off</span>
+                  NOT FOUND ON BLOCKCHAIN
                 </div>
                 <p className="text-xs text-[#bbcabf] leading-relaxed">
-                  {result.message || "The SHA-256 byte digest of the uploaded file does not match any registered document on the Ethereum blockchain."}
+                  {result.message || "No registered document record matching this file's SHA-256 hash was found on the Ethereum blockchain."}
                 </p>
                 {result.uploadedDocumentHash && (
-                  <div className="p-2 bg-[#0d141e] rounded border border-red-500/20 text-xs font-mono">
-                    <span className="text-[#bbcabf] block mb-0.5">Checked hash:</span>
-                    <span className="text-red-400 break-all">{result.uploadedDocumentHash}</span>
+                  <div className="p-2.5 bg-[#0d141e] rounded border border-amber-500/20 text-xs font-mono">
+                    <span className="text-[#bbcabf] block mb-0.5">Checked Hash:</span>
+                    <span className="text-amber-400 break-all">{result.uploadedDocumentHash}</span>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* UNAVAILABLE / ERROR result */}
+            {result && !loading && (result.status === "UNAVAILABLE" || result.status === "ERROR") && (
+              <div className="space-y-3">
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-yellow-500/15 text-yellow-400 border border-yellow-500/30 text-xs font-bold">
+                  <span className="material-symbols-outlined text-[16px]">wifi_off</span>
+                  VERIFICATION SERVICE UNAVAILABLE
+                </div>
+                <p className="text-xs text-[#bbcabf] leading-relaxed">
+                  {result.message || "The Ethereum blockchain network or node provider is currently unreachable. Please try again shortly."}
+                </p>
               </div>
             )}
           </div>

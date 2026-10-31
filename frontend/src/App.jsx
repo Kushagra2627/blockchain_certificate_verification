@@ -30,6 +30,7 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/verify" element={<VerifyCertificate />} />
+              <Route path="/verify/:documentId" element={<VerifyCertificate />} />
 
               {/* Shared Admin & Student Protected Routes */}
               <Route

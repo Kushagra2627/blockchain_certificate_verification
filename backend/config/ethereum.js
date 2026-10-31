@@ -33,11 +33,14 @@ const initEthereum = () => {
     // Default minimal ABI fallback if contractDetails ABI is empty
     if (!abi || abi.length === 0) {
       abi = [
-        "function issueCertificate(string _certificateId, string _studentName, string _course, string _institution, string _issueDate) public returns (bool)",
-        "function verifyCertificate(string _certificateId) public view returns (bool isValid, string studentName, string course, string institution, string issueDate, uint256 timestamp, address issuerWallet, bool isRevoked)",
-        "function getCertificate(string _certificateId) public view returns (string certificateId, string studentName, string course, string institution, string issueDate, uint256 timestamp, address issuerWallet, bool isRevoked)",
-        "function updateCertificate(string _certificateId, string _studentName, string _course, string _institution) public returns (bool)",
-        "function certificateExists(string _certificateId) public view returns (bool)"
+        "function issueCertificate(string _certificateId, string _studentName, string _course, string _institution, string _issueDate, bytes32 _documentHash) public returns (bool)",
+        "function getCertificateByHash(bytes32 _documentHash) public view returns (string certificateId, string studentName, string course, string institution, string issueDate, bytes32 documentHash, uint256 timestamp, address issuerWallet, bool exists, bool isRevoked)",
+        "function existsByHash(bytes32 _documentHash) public view returns (bool)",
+        "function revokeCertificateByHash(bytes32 _documentHash) public returns (bool)",
+        "function revokeCertificate(string _certificateId) public returns (bool)",
+        "function updateCertificate(bytes32 _documentHash, string _studentName, string _course, string _institution) public returns (bool)",
+        "function getHashByCertId(string _certificateId) public view returns (bytes32)",
+        "function getTotalCertificatesCount() public view returns (uint256)"
       ];
     }
 

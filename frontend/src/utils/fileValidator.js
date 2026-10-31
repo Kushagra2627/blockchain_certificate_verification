@@ -13,7 +13,7 @@ export function validateSelectedFile(file, category = "document") {
 
   // 1. MAXIMUM FILE SIZE — 10 MB
   if (file.size > MAX_FILE_SIZE_BYTES) {
-    return { valid: false, error: "File size must not exceed 10 MB." };
+    return { valid: false, error: "File size exceeds the maximum allowed limit of 10 MB. Please upload a smaller file." };
   }
 
   const filename = (file.name || "").toLowerCase();

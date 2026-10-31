@@ -8,8 +8,16 @@ const CertificateCard = ({ certificate, isStudentView = false }) => {
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded bg-[#10b981]/20 text-[#4edea3] text-[11px] font-mono font-semibold border border-[#4edea3]/30">
-              {certificate.status === "REVOKED" ? "REVOKED" : "ON-CHAIN CONFIRMED"}
+            <span
+              className={`px-2.5 py-0.5 rounded text-[11px] font-mono font-semibold border ${
+                certificate.status?.toUpperCase() === "REVOKED" || certificate.blockchainStatus?.toUpperCase() === "REVOKED"
+                  ? "bg-[#ffb4ab]/20 text-[#ffb4ab] border-[#ffb4ab]/40"
+                  : "bg-[#10b981]/20 text-[#4edea3] border-[#4edea3]/30"
+              }`}
+            >
+              {certificate.status?.toUpperCase() === "REVOKED" || certificate.blockchainStatus?.toUpperCase() === "REVOKED"
+                ? "REVOKED"
+                : "ON-CHAIN CONFIRMED"}
             </span>
             <span className="px-2 py-0.5 rounded bg-[#0d141e] text-[#bbcabf] text-[10px] font-mono border border-[#3c4a42]/60 uppercase">
               Type: {certificate.fileCategory || "document"}

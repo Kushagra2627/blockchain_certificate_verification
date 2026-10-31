@@ -21,6 +21,7 @@
     "mongodb-memory-server": "^9.1.8",
     "mongoose": "^8.2.3",
     "multer": "^2.4.0",
+    "pdf-lib": "^1.17.1",
     "pdfkit": "^0.15.0",
     "qrcode": "^1.5.3"
   },

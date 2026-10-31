@@ -91,6 +91,31 @@ const certificateSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    verificationUrl: {
+      type: String,
+      default: "",
+    },
+    qrEmbedded: {
+      type: Boolean,
+      default: false,
+    },
+    originalFileHash: {
+      type: String,
+      default: "",
+    },
+    revokedAt: {
+      type: Date,
+      default: null,
+    },
+    revokedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    revocationTxHash: {
+      type: String,
+      default: "",
+    },
   },
   {
     timestamps: true,

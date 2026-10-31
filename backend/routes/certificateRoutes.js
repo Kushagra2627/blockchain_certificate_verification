@@ -13,6 +13,7 @@ const {
   getCertificates,
   getCertificateById,
   verifyCertificate,
+  revokeCertificate,
   updateCertificate,
   deleteCertificate,
   downloadPDF,
@@ -38,6 +39,8 @@ router.post(
   validateCertificateInput,
   issueCertificate
 );
+router.post("/:id/revoke", protect, authorize("Admin"), revokeCertificate);
+router.put("/:id/revoke", protect, authorize("Admin"), revokeCertificate);
 router.put("/:id", protect, authorize("Admin"), updateCertificate);
 router.delete("/:id", protect, authorize("Admin"), deleteCertificate);
 

@@ -2,15 +2,19 @@ import api from "./api";
 
 export const certificateService = {
   /**
-   * Verify a certificate by uploading its original PDF.
+   * Verify a certificate by uploading its file (and optional QR document reference).
    * Backend: POST /api/certificates/verify
    * Returns: { success, verified, status, certificate, blockchainProof, uploadedDocumentHash }
    */
-  async verifyCertificate(file, category = "document") {
+  async verifyCertificate(file, category = "document", documentId = "") {
     const formData = new FormData();
     formData.append("certificatePdf", file);
     formData.append("category", category);
     formData.append("fileCategory", category);
+    if (documentId && documentId.trim()) {
+      formData.append("documentId", documentId.trim());
+      formData.append("certificateId", documentId.trim());
+    }
     // Do NOT set Content-Type header manually — axios sets multipart/form-data with boundary automatically
     const response = await api.post("/certificates/verify", formData);
     return response.data;
@@ -53,6 +57,15 @@ export const certificateService = {
    */
   async updateCertificate(id, updateData) {
     const response = await api.put(`/certificates/${id}`, updateData);
+    return response.data;
+  },
+
+  /**
+   * Revoke a certificate on Ethereum Sepolia smart contract (Admin only).
+   * Backend: POST /api/certificates/:id/revoke
+   */
+  async revokeCertificate(id) {
+    const response = await api.post(`/certificates/${id}/revoke`);
     return response.data;
   },
 

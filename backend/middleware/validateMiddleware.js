@@ -8,16 +8,20 @@ const DOCUMENT_MIMES = [
   "application/x-rtf",
   "text/rtf",
   "application/vnd.oasis.opendocument.text",
+  "application/octet-stream", // Fallback for browsers without registered OS file association
 ];
 
 const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tif", ".tiff", ".svg"];
 const IMAGE_MIMES = [
   "image/jpeg",
   "image/jpg",
+  "image/pjpeg",
   "image/png",
+  "image/x-png",
   "image/webp",
   "image/gif",
   "image/bmp",
+  "image/x-ms-bmp",
   "image/tiff",
   "image/svg+xml",
 ];
@@ -29,7 +33,10 @@ const validateFileUpload = (req, res, next) => {
 
   // 1. Enforce STRICT 10 MB size limit
   if (req.file.size > 10 * 1024 * 1024) {
-    return res.status(400).json({ success: false, message: "File size must not exceed 10 MB." });
+    return res.status(400).json({
+      success: false,
+      message: "File size exceeds the maximum allowed limit of 10 MB. Please upload a smaller file.",
+    });
   }
 
   const category = (req.body.fileCategory || req.body.category || "document").toLowerCase().trim();
@@ -37,20 +44,26 @@ const validateFileUpload = (req, res, next) => {
   const ext = filename.lastIndexOf(".") !== -1 ? filename.substring(filename.lastIndexOf(".")) : "";
   const mime = (req.file.mimetype || "").toLowerCase();
 
-  const isDocExtOrMime = DOCUMENT_EXTENSIONS.includes(ext) || DOCUMENT_MIMES.includes(mime);
-  const isImgExtOrMime = IMAGE_EXTENSIONS.includes(ext) || IMAGE_MIMES.includes(mime);
+  const isDocExt = DOCUMENT_EXTENSIONS.includes(ext);
+  const isDocMime = DOCUMENT_MIMES.includes(mime) && mime !== "application/octet-stream";
+  const isDocExtOrMime = isDocExt || isDocMime;
+
+  const isImgExt = IMAGE_EXTENSIONS.includes(ext);
+  const isImgMime = IMAGE_MIMES.includes(mime);
+  const isImgExtOrMime = isImgExt || isImgMime;
 
   // Helper magic bytes detector
   const buf = req.file.buffer;
   let detectedType = null;
   if (buf.length >= 4) {
     if (buf.toString("utf8", 0, 4) === "%PDF") detectedType = "document"; // PDF
+    else if (buf[0] === 0xd0 && buf[1] === 0xcf && buf[2] === 0x11 && buf[3] === 0xe0) detectedType = "document"; // DOC (OLE CFBF)
+    else if (buf.toString("utf8", 0, 4) === "PK\x03\x04") detectedType = "document"; // DOCX / ODT
     else if (buf[0] === 0x89 && buf.toString("utf8", 1, 4) === "PNG") detectedType = "image"; // PNG
     else if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) detectedType = "image"; // JPEG
     else if (buf.toString("utf8", 0, 4) === "GIF8") detectedType = "image"; // GIF
     else if (buf.toString("utf8", 0, 2) === "BM") detectedType = "image"; // BMP
     else if (buf.toString("utf8", 0, 4) === "RIFF" && buf.length >= 12 && buf.toString("utf8", 8, 12) === "WEBP") detectedType = "image"; // WEBP
-    else if (buf.toString("utf8", 0, 4) === "PK\x03\x04") detectedType = "document"; // DOCX / ZIP
   }
 
   if (category === "document") {
